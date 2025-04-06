@@ -3,6 +3,7 @@ package com.sozonext.starryapp
 import android.app.admin.DeviceAdminReceiver
 import android.content.Context
 import android.content.Intent
+import com.sozonext.starryapp.utils.KioskUtils
 
 class MyDeviceAdminReceiver : DeviceAdminReceiver() {
 
