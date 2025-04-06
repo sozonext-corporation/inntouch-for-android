@@ -2,6 +2,7 @@ package com.sozonext.starryapp.ui.activity
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
@@ -18,8 +19,8 @@ import androidx.core.content.ContextCompat
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
-import com.sozonext.starryapp.utils.DataStoreUtils
 import com.sozonext.starryapp.R
+import com.sozonext.starryapp.utils.DataStoreUtils
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 
@@ -78,9 +79,7 @@ class QRCodeScannerActivity : AppCompatActivity() {
                     for (barcode in barcodes) {
                         val rawValue = barcode.rawValue
                         if (!rawValue.isNullOrEmpty()) {
-                            Log.d("QRCode", "Scanned: $rawValue")
-                            val jsonString = barcode.rawValue.toString()
-                            val json = JSONObject(jsonString)
+                            val json = JSONObject(barcode.rawValue.toString())
                             runBlocking {
                                 DataStoreUtils(applicationContext).setDataStoreValue(
                                     DataStoreUtils.PASSWORD, json.getString("password")
@@ -92,6 +91,9 @@ class QRCodeScannerActivity : AppCompatActivity() {
                                     DataStoreUtils.CONFIG_URL, json.getString("config_url")
                                 )
                             }
+                            val intent = Intent()
+                            intent.putExtra("event", "navigateStartUrl")
+                            setResult(RESULT_OK, intent)
                             finish()
                         }
                     }

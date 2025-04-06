@@ -11,11 +11,12 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.sozonext.starryapp.R
 import com.sozonext.starryapp.utils.DataStoreUtils
 import com.sozonext.starryapp.utils.KioskUtils
-import com.sozonext.starryapp.R
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
@@ -44,14 +45,12 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         webView.settings.mediaPlaybackRequiresUserGesture = false
 
         val startUrl: String = runBlocking {
-            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.START_URL).first()
-                .toString()
+            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.START_URL).first().toString()
         }
         if (startUrl.isNotEmpty()) {
             webView.loadUrl(startUrl)
         } else {
-            val intent = Intent(this, QRCodeScannerActivity::class.java)
-            startActivity(intent)
+            launchQRCodeActivity()
         }
 
     }
@@ -62,16 +61,27 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         }
         if (++counter >= 5) {
             counter = 0
-            // runBlocking {DataStoreUtils(applicationContext).resetDataStore()}
-            // KioskUtils(this).stop(this)
             openPasswordDialog()
+        }
+    }
+
+    private val launcher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val event: String = result.data?.getStringExtra("event") ?: ""
+            when (event) {
+                "navigateStartUrl" -> navigateStartUrl()
+                "navigateConfigUrl" -> navigateConfigUrl()
+                "launchQRCodeActivity" -> launchQRCodeActivity()
+            }
         }
     }
 
     private fun openPasswordDialog() {
         val dialogEditPassword = layoutInflater.inflate(R.layout.dialog_edit_password, null)
         val alertDialog = AlertDialog.Builder(this)
-            .setTitle("設定画面")
+            .setTitle("アプリ設定")
             .setMessage("パスワードを入力してください。")
             .setView(dialogEditPassword)
             .setCancelable(false)
@@ -83,11 +93,11 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                 val inputPassword =
                     dialogEditPassword.findViewById<EditText>(R.id.editTextPassword).text.toString()
                 val password: String = runBlocking {
-                    DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.PASSWORD)
-                        .first().toString()
+                    DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.PASSWORD).first().toString()
                 }
                 if (inputPassword == password) {
-                    startActivity(Intent(this, MenuActivity::class.java))
+                    val intent = Intent(this, MenuActivity::class.java)
+                    launcher.launch(intent)
                     alertDialog.dismiss()
                 } else {
                     Toast.makeText(this, "パスワードが間違っています", Toast.LENGTH_SHORT).show()
@@ -95,6 +105,25 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             }
         }
         alertDialog.show()
+    }
+
+    private fun navigateStartUrl() {
+        val startUrl: String = runBlocking {
+            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.START_URL).first().toString()
+        }
+        webView.loadUrl(startUrl)
+    }
+
+    private fun navigateConfigUrl() {
+        val startUrl: String = runBlocking {
+            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.CONFIG_URL).first().toString()
+        }
+        webView.loadUrl(startUrl)
+    }
+
+    private fun launchQRCodeActivity() {
+        val intent = Intent(this, QRCodeScannerActivity::class.java)
+        launcher.launch(intent)
     }
 
 }

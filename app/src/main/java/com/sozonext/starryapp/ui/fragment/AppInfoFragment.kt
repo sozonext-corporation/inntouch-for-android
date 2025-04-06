@@ -11,50 +11,47 @@ import com.sozonext.starryapp.utils.DataStoreUtils
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
-class InformationFragment : Fragment() {
-
-    private lateinit var listView: ListView
+class AppInfoFragment : Fragment() {
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        listView = ListView(requireContext())
+        val context = requireContext()
+        val listView = ListView(context)
         runBlocking {
-            val ds = DataStoreUtils(requireContext())
+            val ds = DataStoreUtils(context)
             val data = listOf(
                 mapOf(
-                    "key" to "PASSWORD",
+                    "key" to "パスワード",
                     "value" to ds.getDataStoreValue(DataStoreUtils.PASSWORD).first().toString(),
                 ),
                 mapOf(
-                    "key" to "START_URL",
+                    "key" to "起動 URL",
                     "value" to ds.getDataStoreValue(DataStoreUtils.START_URL).first().toString(),
                 ),
                 mapOf(
-                    "key" to "CONFIG_URL",
+                    "key" to "設定 URL",
                     "value" to ds.getDataStoreValue(DataStoreUtils.CONFIG_URL).first().toString(),
                 ),
                 mapOf(
-                    "key" to "SIP_SERVER",
+                    "key" to "SIP SERVER",
                     "value" to ds.getDataStoreValue(DataStoreUtils.SIP_SERVER).first().toString(),
                 ),
                 mapOf(
-                    "key" to "SIP_DOMAIN",
+                    "key" to "SIP DOMAIN",
                     "value" to ds.getDataStoreValue(DataStoreUtils.SIP_DOMAIN).first().toString(),
                 ),
                 mapOf(
-                    "key" to "EXTENSION_NUMBER",
-                    "value" to ds.getDataStoreValue(DataStoreUtils.EXTENSION_NUMBER).first()
-                        .toString(),
+                    "key" to "EXTENSION NUMBER",
+                    "value" to ds.getDataStoreValue(DataStoreUtils.EXTENSION_NUMBER).first().toString(),
                 ),
                 mapOf(
-                    "key" to "EXTENSION_PASSWORD",
-                    "value" to ds.getDataStoreValue(DataStoreUtils.EXTENSION_PASSWORD).first()
-                        .toString(),
+                    "key" to "EXTENSION PASSWORD",
+                    "value" to ds.getDataStoreValue(DataStoreUtils.EXTENSION_PASSWORD).first().toString(),
                 ),
             )
             listView.adapter = SimpleAdapter(
-                requireContext(),
+                context,
                 data,
                 android.R.layout.simple_list_item_2,
                 arrayOf("key", "value"),
