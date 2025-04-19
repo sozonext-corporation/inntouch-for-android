@@ -1,12 +1,21 @@
 package com.sozonext.starryapp.ui.activity
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.http.SslError
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.ViewGroup
+import android.webkit.JsResult
+import android.webkit.PermissionRequest
+import android.webkit.SslErrorHandler
+import android.webkit.WebChromeClient
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
@@ -14,6 +23,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.sozonext.starryapp.R
 import com.sozonext.starryapp.utils.DataStoreUtils
 import com.sozonext.starryapp.utils.KioskUtils
@@ -43,6 +54,40 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.mediaPlaybackRequiresUserGesture = false
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                super.onShowCustomView(view, callback)
+                webView.addView(
+                    view, ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                    )
+                )
+            }
+            override fun onPermissionRequest(request: PermissionRequest) {
+                // カメラやマイク使用要求に自動で許可
+                request.grant(request.resources)
+            }
+            override fun onHideCustomView() {
+                super.onHideCustomView()
+                webView.removeAllViews()
+            }
+
+            override fun onJsAlert(view: WebView, url: String, message: String, result: JsResult): Boolean {
+                result.cancel()
+                return true
+            }
+        }
+        webView.webViewClient = object : WebViewClient() {
+            @SuppressLint("WebViewClientOnReceivedSslError")
+            override fun onReceivedSslError(
+                view: WebView,
+                handler: SslErrorHandler,
+                error: SslError
+            ) {
+                handler.proceed()
+            }
+        }
 
         val startUrl: String = runBlocking {
             DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.START_URL).first().toString()
@@ -53,6 +98,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             launchQRCodeActivity()
         }
 
+        requestPermissions()
     }
 
     override fun onClick(v: View?) {
@@ -71,6 +117,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         if (result.resultCode == RESULT_OK) {
             val event: String = result.data?.getStringExtra("event") ?: ""
             when (event) {
+                "clearCache" -> clearCache()
                 "navigateStartUrl" -> navigateStartUrl()
                 "navigateConfigUrl" -> navigateConfigUrl()
                 "launchQRCodeActivity" -> launchQRCodeActivity()
@@ -107,6 +154,13 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         alertDialog.show()
     }
 
+    private fun clearCache() {
+        webView.clearCache(true)
+        webView.clearHistory()
+        cacheDir.deleteRecursively()
+        navigateStartUrl()
+    }
+
     private fun navigateStartUrl() {
         val startUrl: String = runBlocking {
             DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.START_URL).first().toString()
@@ -126,4 +180,24 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         launcher.launch(intent)
     }
 
+    private val REQUEST_CODE_PERMISSIONS = 123
+    private fun requestPermissions() {
+        val permissionsNeeded = mutableListOf<String>()
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionsNeeded.add(Manifest.permission.CAMERA)
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionsNeeded.add(Manifest.permission.RECORD_AUDIO)
+        }
+
+        if (permissionsNeeded.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissionsNeeded.toTypedArray(), REQUEST_CODE_PERMISSIONS)
+        }
+    }
 }

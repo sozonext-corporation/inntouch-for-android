@@ -22,31 +22,31 @@ class AppInfoFragment : Fragment() {
             val ds = DataStoreUtils(context)
             val data = listOf(
                 mapOf(
-                    "key" to "パスワード",
+                    "key" to "PASSWORD",
                     "value" to ds.getDataStoreValue(DataStoreUtils.PASSWORD).first().toString(),
                 ),
                 mapOf(
-                    "key" to "起動 URL",
+                    "key" to "START_URL",
                     "value" to ds.getDataStoreValue(DataStoreUtils.START_URL).first().toString(),
                 ),
                 mapOf(
-                    "key" to "設定 URL",
+                    "key" to "CONFIG_URL",
                     "value" to ds.getDataStoreValue(DataStoreUtils.CONFIG_URL).first().toString(),
                 ),
                 mapOf(
-                    "key" to "SIP SERVER",
+                    "key" to "SIP_SERVER",
                     "value" to ds.getDataStoreValue(DataStoreUtils.SIP_SERVER).first().toString(),
                 ),
                 mapOf(
-                    "key" to "SIP DOMAIN",
+                    "key" to "SIP_DOMAIN",
                     "value" to ds.getDataStoreValue(DataStoreUtils.SIP_DOMAIN).first().toString(),
                 ),
                 mapOf(
-                    "key" to "EXTENSION NUMBER",
+                    "key" to "EXTENSION_NUMBER",
                     "value" to ds.getDataStoreValue(DataStoreUtils.EXTENSION_NUMBER).first().toString(),
                 ),
                 mapOf(
-                    "key" to "EXTENSION PASSWORD",
+                    "key" to "EXTENSION_PASSWORD",
                     "value" to ds.getDataStoreValue(DataStoreUtils.EXTENSION_PASSWORD).first().toString(),
                 ),
             )

@@ -25,6 +25,9 @@ class GeneralSettingsFragment : Fragment() {
             mapOf(
                 "key" to "アプリの固定を解除する",
             ),
+            mapOf(
+                "key" to "キャッシュを削除する",
+            ),
         )
         listView.adapter = SimpleAdapter(
             context,
@@ -39,6 +42,8 @@ class GeneralSettingsFragment : Fragment() {
                 0 -> navigateConfigUrl()
                 // アプリの固定を解除する
                 1 -> KioskUtils(context).stop(requireActivity())
+                // キャッシュを削除する
+                2 -> clearCache()
             }
         }
         return listView
@@ -47,6 +52,13 @@ class GeneralSettingsFragment : Fragment() {
     private fun navigateConfigUrl() {
         val intent = Intent()
         intent.putExtra("event", "navigateConfigUrl")
+        requireActivity().setResult(Activity.RESULT_OK, intent)
+        requireActivity().finish()
+    }
+
+    private fun clearCache() {
+        val intent = Intent()
+        intent.putExtra("event", "clearCache")
         requireActivity().setResult(Activity.RESULT_OK, intent)
         requireActivity().finish()
     }
