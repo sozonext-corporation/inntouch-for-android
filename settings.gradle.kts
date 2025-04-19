@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "STARRY APP"
+rootProject.name = "InnTouch APP"
 include(":app")
  

@@ -1,11 +1,11 @@
-package com.sozonext.starryapp.utils
+package com.sozonext.inn_touch.utils
 
 import android.app.Activity
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.widget.Toast
-import com.sozonext.starryapp.MyDeviceAdminReceiver
+import com.sozonext.inn_touch.MyDeviceAdminReceiver
 
 class KioskUtils(private val context: Context) {
 

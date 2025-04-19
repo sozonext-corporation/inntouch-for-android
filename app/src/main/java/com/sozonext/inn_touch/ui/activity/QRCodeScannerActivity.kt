@@ -1,4 +1,4 @@
-package com.sozonext.starryapp.ui.activity
+package com.sozonext.inn_touch.ui.activity
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -19,8 +19,8 @@ import androidx.core.content.ContextCompat
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
-import com.sozonext.starryapp.R
-import com.sozonext.starryapp.utils.DataStoreUtils
+import com.sozonext.inn_touch.R
+import com.sozonext.inn_touch.utils.DataStoreUtils
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 

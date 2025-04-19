@@ -1,4 +1,4 @@
-package com.sozonext.starryapp
+package com.sozonext.inn_touch
 
 import org.junit.Test
 

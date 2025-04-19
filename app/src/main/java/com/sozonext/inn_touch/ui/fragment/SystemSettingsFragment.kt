@@ -1,4 +1,4 @@
-package com.sozonext.starryapp.ui.fragment
+package com.sozonext.inn_touch.ui.fragment
 
 import android.app.Activity
 import android.content.Intent
@@ -10,7 +10,7 @@ import android.widget.ListView
 import android.widget.SimpleAdapter
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
-import com.sozonext.starryapp.utils.DataStoreUtils
+import com.sozonext.inn_touch.utils.DataStoreUtils
 import kotlinx.coroutines.runBlocking
 
 

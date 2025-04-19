@@ -1,4 +1,4 @@
-package com.sozonext.starryapp.ui.fragment
+package com.sozonext.inn_touch.ui.fragment
 
 import android.app.Activity
 import android.content.Intent
@@ -9,7 +9,7 @@ import android.view.ViewGroup
 import android.widget.ListView
 import android.widget.SimpleAdapter
 import androidx.fragment.app.Fragment
-import com.sozonext.starryapp.utils.KioskUtils
+import com.sozonext.inn_touch.utils.KioskUtils
 
 class GeneralSettingsFragment : Fragment() {
 

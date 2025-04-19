@@ -1,4 +1,4 @@
-package com.sozonext.starryapp.utils
+package com.sozonext.inn_touch.utils
 
 import android.content.Context
 import android.util.Log

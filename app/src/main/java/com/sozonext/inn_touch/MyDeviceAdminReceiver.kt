@@ -1,9 +1,9 @@
-package com.sozonext.starryapp
+package com.sozonext.inn_touch
 
 import android.app.admin.DeviceAdminReceiver
 import android.content.Context
 import android.content.Intent
-import com.sozonext.starryapp.utils.KioskUtils
+import com.sozonext.inn_touch.utils.KioskUtils
 
 class MyDeviceAdminReceiver : DeviceAdminReceiver() {
 

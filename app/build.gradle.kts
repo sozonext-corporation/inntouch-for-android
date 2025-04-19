@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.sozonext.starryapp"
+    namespace = "com.sozonext.inn_touch"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.sozonext.starryapp"
+        applicationId = "com.sozonext.inn_touch"
         minSdk = 30
         targetSdk = 35
         versionCode = 1

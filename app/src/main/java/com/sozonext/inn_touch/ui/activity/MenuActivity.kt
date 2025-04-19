@@ -1,13 +1,13 @@
-package com.sozonext.starryapp.ui.activity
+package com.sozonext.inn_touch.ui.activity
 
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.tabs.TabLayout
-import com.sozonext.starryapp.R
-import com.sozonext.starryapp.ui.fragment.GeneralSettingsFragment
-import com.sozonext.starryapp.ui.fragment.AppInfoFragment
-import com.sozonext.starryapp.ui.fragment.SystemSettingsFragment
+import com.sozonext.inn_touch.R
+import com.sozonext.inn_touch.ui.fragment.GeneralSettingsFragment
+import com.sozonext.inn_touch.ui.fragment.AppInfoFragment
+import com.sozonext.inn_touch.ui.fragment.SystemSettingsFragment
 
 class MenuActivity : AppCompatActivity() {
 

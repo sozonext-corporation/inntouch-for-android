@@ -1,4 +1,4 @@
-package com.sozonext.starryapp.ui.fragment
+package com.sozonext.inn_touch.ui.fragment
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -7,7 +7,7 @@ import android.view.ViewGroup
 import android.widget.ListView
 import android.widget.SimpleAdapter
 import androidx.fragment.app.Fragment
-import com.sozonext.starryapp.utils.DataStoreUtils
+import com.sozonext.inn_touch.utils.DataStoreUtils
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 

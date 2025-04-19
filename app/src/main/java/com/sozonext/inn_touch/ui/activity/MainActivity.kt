@@ -1,4 +1,4 @@
-package com.sozonext.starryapp.ui.activity
+package com.sozonext.inn_touch.ui.activity
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -25,9 +25,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.sozonext.starryapp.R
-import com.sozonext.starryapp.utils.DataStoreUtils
-import com.sozonext.starryapp.utils.KioskUtils
+import com.sozonext.inn_touch.R
+import com.sozonext.inn_touch.utils.DataStoreUtils
+import com.sozonext.inn_touch.utils.KioskUtils
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
