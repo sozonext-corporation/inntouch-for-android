@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.sozonext.inn_touch"
+    namespace = "com.sozonext.inntouch"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.sozonext.inn_touch"
+        applicationId = "com.sozonext.inntouch"
         minSdk = 30
         targetSdk = 35
         versionCode = 1
@@ -45,6 +45,8 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    // FireBase
+    implementation(libs.firebase.messaging)
     // DataStore
     implementation(libs.androidx.datastore.preferences)
     // QR Code Reader
@@ -53,4 +55,6 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
+    // JAR Files
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
 }
