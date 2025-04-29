@@ -56,5 +56,6 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     // JAR Files
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
+    implementation(files("libs/portsip_voip_sdk_for_android_v19.4.7.jar"))
+    // implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
 }

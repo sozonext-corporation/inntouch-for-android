@@ -1,19 +1,15 @@
 package com.sozonext.inntouch.ui.activity
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.http.SslError
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.JsResult
 import android.webkit.PermissionRequest
-import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
@@ -23,13 +19,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import com.sozonext.inntouch.R
-import com.sozonext.inntouch.service.PortSipService
+import com.sozonext.inntouch.ui.JavaScriptInterface
 import com.sozonext.inntouch.utils.DataStoreUtils
 import com.sozonext.inntouch.utils.KioskUtils
-import com.sozonext.inntouch.utils.portsip.CallManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
@@ -46,6 +39,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
+        // On Click Listener
         this.findViewById<Button>(R.id.button).setOnClickListener(this)
 
         // Kiosk Mode
@@ -53,10 +47,26 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
         // WebView
         webView = findViewById(R.id.webView)
-        webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        webView.settings.javaScriptEnabled = true
         webView.settings.mediaPlaybackRequiresUserGesture = false
+        webView.addJavascriptInterface(JavaScriptInterface(this), "Android")
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                super.shouldOverrideUrlLoading(view, request)
+                view.loadUrl(request.url.toString())
+                return true
+            }
+        }
         webView.webChromeClient = object : WebChromeClient() {
+            // 21 onHideCustomView
+            override fun onHideCustomView() {
+                super.onHideCustomView()
+                webView.removeAllViews()
+            }
+
+            // 47 onShowCustomView
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                 super.onShowCustomView(view, callback)
                 webView.addView(
@@ -66,29 +76,13 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                     )
                 )
             }
+
+            // 33 onPermissionRequest
             override fun onPermissionRequest(request: PermissionRequest) {
-                // カメラやマイク使用要求に自動で許可
+                super.onPermissionRequest(request)
                 request.grant(request.resources)
             }
-            override fun onHideCustomView() {
-                super.onHideCustomView()
-                webView.removeAllViews()
-            }
 
-            override fun onJsAlert(view: WebView, url: String, message: String, result: JsResult): Boolean {
-                result.cancel()
-                return true
-            }
-        }
-        webView.webViewClient = object : WebViewClient() {
-            @SuppressLint("WebViewClientOnReceivedSslError")
-            override fun onReceivedSslError(
-                view: WebView,
-                handler: SslErrorHandler,
-                error: SslError
-            ) {
-                handler.proceed()
-            }
         }
 
         val startUrl: String = runBlocking {
@@ -99,8 +93,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         } else {
             launchQRCodeActivity()
         }
-
-        requestPermissions()
     }
 
     override fun onClick(v: View?) {
@@ -129,18 +121,10 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
     private fun openPasswordDialog() {
         val dialogEditPassword = layoutInflater.inflate(R.layout.dialog_edit_password, null)
-        val alertDialog = AlertDialog.Builder(this)
-            .setTitle("アプリ設定")
-            .setMessage("パスワードを入力してください。")
-            .setView(dialogEditPassword)
-            .setCancelable(false)
-            .setPositiveButton("OK") { _, _ -> }
-            .setNegativeButton("キャンセル") { _, _ -> }
-            .create()
+        val alertDialog = AlertDialog.Builder(this).setTitle("アプリ設定").setMessage("パスワードを入力してください。").setView(dialogEditPassword).setCancelable(false).setPositiveButton("OK") { _, _ -> }.setNegativeButton("キャンセル") { _, _ -> }.create()
         alertDialog.setOnShowListener {
             alertDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val inputPassword =
-                    dialogEditPassword.findViewById<EditText>(R.id.editTextPassword).text.toString()
+                val inputPassword = dialogEditPassword.findViewById<EditText>(R.id.editTextPassword).text.toString()
                 val password: String = runBlocking {
                     DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.PASSWORD).first().toString()
                 }
@@ -180,27 +164,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
     private fun launchQRCodeActivity() {
         val intent = Intent(this, QRCodeScannerActivity::class.java)
         launcher.launch(intent)
-    }
-
-    private val REQUEST_CODE_PERMISSIONS = 123
-    private fun requestPermissions() {
-        val permissionsNeeded = mutableListOf<String>()
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            permissionsNeeded.add(Manifest.permission.CAMERA)
-        }
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            permissionsNeeded.add(Manifest.permission.RECORD_AUDIO)
-        }
-
-        if (permissionsNeeded.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, permissionsNeeded.toTypedArray(), REQUEST_CODE_PERMISSIONS)
-        }
     }
 
 }

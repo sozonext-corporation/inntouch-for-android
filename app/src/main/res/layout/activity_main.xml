@@ -27,6 +27,7 @@
             android:layout_width="80dp"
             android:layout_height="80dp"
             android:layout_gravity="center|end"
+            android:background="@android:color/transparent"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:visibility="visible" />
