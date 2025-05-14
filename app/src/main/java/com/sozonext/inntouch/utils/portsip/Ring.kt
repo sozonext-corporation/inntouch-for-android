@@ -1,101 +1,110 @@
 package com.sozonext.inntouch.utils.portsip
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.media.Ringtone
 import android.media.RingtoneManager
-import android.media.ToneGenerator
+import android.net.Uri
 import android.provider.Settings
+import com.sozonext.inntouch.R
 
-class Ring
-private constructor(context: Context) {
-    private var mRingbackPlayer: ToneGenerator? = null
-    protected var mRingtonePlayer: Ringtone? = null
-    var ringRef: Int = 0
-    private val mContext: Context?
+class Ring(private val context: Context) {
+
+    companion object {
+        @SuppressLint("StaticFieldLeak")
+        @Volatile
+        private var instance: Ring? = null
+
+        fun getInstance(context: Context): Ring =
+            instance ?: synchronized(this) {
+                instance ?: Ring(context.applicationContext).also { instance = it }
+            }
+    }
+
+    private var incomingRingtone: Ringtone? = null
+    private var incomingRingtoneCount = 0
+
+    private var outgoingToneMediaPlayer: MediaPlayer? = null
+
     private var savedMode = AudioManager.MODE_INVALID
-    var audioManager: AudioManager
+    private val audioManager: AudioManager =
+        context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-    init {
-        mContext = context
-        audioManager = mContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    }
+    fun startIncomingTone() {
 
-    fun stop(): Boolean {
-        stopRingBackTone()
-        stopRingTone()
-        return true
-    }
-
-
-    fun startRingTone() {
-        if (mRingtonePlayer != null && mRingtonePlayer!!.isPlaying) {
-            ringRef++
+        if (incomingRingtone?.isPlaying == true) {
+            incomingRingtoneCount++
             return
         }
 
-        if (mRingtonePlayer == null && mContext != null) {
-            mRingtonePlayer = RingtoneManager.getRingtone(mContext, Settings.System.DEFAULT_RINGTONE_URI)
+        if (incomingRingtone == null) {
+            incomingRingtone = RingtoneManager.getRingtone(context, Settings.System.DEFAULT_RINGTONE_URI)
         }
 
         savedMode = audioManager.mode
         audioManager.mode = AudioManager.MODE_RINGTONE
 
-        if (mRingtonePlayer != null) {
-            synchronized(mRingtonePlayer!!) {
-                ringRef++
-                mRingtonePlayer!!.play()
+        incomingRingtone?.let {
+            synchronized(it) {
+                incomingRingtoneCount++
+                it.play()
             }
         }
     }
 
-    fun stopRingTone() {
-        if (mRingtonePlayer != null) {
-            synchronized(mRingtonePlayer!!) {
-                if (--ringRef <= 0) {
-                    audioManager.mode = savedMode
-
-                    mRingtonePlayer!!.stop()
-                    mRingtonePlayer = null
+    fun stopIncomingTone() {
+        incomingRingtone?.let {
+            synchronized(it) {
+                if (--incomingRingtoneCount <= 0) {
+                    it.stop()
+                    incomingRingtone = null
+                    audioManager.mode = AudioManager.MODE_NORMAL
                 }
             }
         }
     }
 
-    fun startRingBackTone() {
-        if (mRingbackPlayer == null) {
-            mRingbackPlayer = try {
-                ToneGenerator(AudioManager.STREAM_VOICE_CALL, TONE_RELATIVE_VOLUME)
-            } catch (e: RuntimeException) {
-                null
+    fun startOutgoingTone() {
+        stopOutgoingTone()
+        try {
+            val uri = Uri.Builder()
+                .scheme("android.resource")
+                .authority(context.packageName)
+                .appendPath(R.raw.outgoing_tone.toString())
+                .build()
+            outgoingToneMediaPlayer = MediaPlayer.create(context, uri).apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                isLooping = true
+                start()
             }
-        }
-        if (mRingbackPlayer != null) {
-            synchronized(mRingbackPlayer!!) {
-                mRingbackPlayer!!.startTone(ToneGenerator.TONE_SUP_RINGTONE)
-            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            outgoingToneMediaPlayer = null
         }
     }
 
-    fun stopRingBackTone() {
-        if (mRingbackPlayer != null) {
-            synchronized(mRingbackPlayer!!) {
-                mRingbackPlayer!!.stopTone()
-                mRingbackPlayer = null
+    fun stopOutgoingTone() {
+        outgoingToneMediaPlayer?.let {
+            if (it.isPlaying) {
+                it.stop()
             }
+            it.release()
         }
+        outgoingToneMediaPlayer = null
     }
 
-    companion object {
-        private const val TONE_RELATIVE_VOLUME = 70
-        private var single: Ring? = null
-        fun getInstance(context: Context): Ring {
-            if (single == null) {
-                single = Ring(context)
-            }
-            return single!!
-        }
+    fun stopAllTone(): Boolean {
+        stopIncomingTone()
+        stopOutgoingTone()
+        return true
     }
+
 }
-
-
