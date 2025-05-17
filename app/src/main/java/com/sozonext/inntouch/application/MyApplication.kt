@@ -5,20 +5,16 @@ import com.portsip.PortSipSdk
 
 class MyApplication : Application() {
 
-    lateinit var portSipSdk: PortSipSdk
-        private set
-
-    var mConference: Boolean = false
-    var mUseFrontCamera: Boolean = false
+    var isConference: Boolean = false
+    var isUseFrontCamera: Boolean = false
 
     companion object {
-        lateinit var instance: MyApplication
+        lateinit var portSipSdk: PortSipSdk
             private set
     }
 
     override fun onCreate() {
         super.onCreate()
-        instance = this
         portSipSdk = PortSipSdk(this)
     }
 

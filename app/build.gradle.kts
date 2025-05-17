@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    // id("com.google.gms.google-services") version "4.4.2"
 }
 
 android {
@@ -42,10 +43,13 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.firebase.crashlytics.buildtools)
+    implementation(libs.androidx.media3.common.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     // FireBase
+    // implementation(libs.google.services)
     implementation(libs.firebase.messaging)
     // DataStore
     implementation(libs.androidx.datastore.preferences)

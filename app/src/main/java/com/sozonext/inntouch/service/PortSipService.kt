@@ -1,12 +1,16 @@
 package com.sozonext.inntouch.service
 
+import android.annotation.SuppressLint
+import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.text.TextUtils
 import android.util.Log
-import android.widget.Toast
+import androidx.core.app.NotificationCompat
 import com.portsip.OnPortSIPEvent
 import com.portsip.PortSipEnumDefine
 import com.portsip.PortSipEnumDefine.ENUM_TRANSPORT_UDP
@@ -15,6 +19,9 @@ import com.sozonext.inntouch.application.MyApplication
 import com.sozonext.inntouch.receiver.NetWorkReceiver
 import com.sozonext.inntouch.utils.DataStoreUtils
 import com.sozonext.inntouch.utils.portsip.CallManager
+import com.sozonext.inntouch.utils.portsip.CallStateFlag
+import com.sozonext.inntouch.utils.portsip.Ring
+import com.sozonext.inntouch.utils.portsip.Session
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.util.Random
@@ -22,8 +29,9 @@ import java.util.Random
 class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListener {
 
     private val tag: String = PortSipService::class.java.simpleName
-    private val portSipSdk = MyApplication.instance.portSipSdk
     private var pushToken: String = ""
+
+    private val portSipSdk = MyApplication.portSipSdk
 
     companion object {
 
@@ -32,8 +40,12 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         const val ACTION_SIP_REGISTER: String = "com.sozonext.inntouch.action.SIP_REGISTER"
         const val ACTION_SIP_UNREGISTER: String = "com.sozonext.inntouch.action.SIP_UNREGISTER"
 
+        const val ACTION_INVITE_ANSWERED: String = "com.sozonext.inntouch.action.ACTION_INVITE_ANSWERED"
+
         const val ACTION_PUSH_TOKEN: String = "com.sozonext.inntouch.action.PUSH_TOKEN"
         const val ACTION_PUSH_MESSAGE: String = "com.sozonext.inntouch.action.PUSH_MESSAGE"
+
+        // const val ACTION_SIP_UNREGISTER: String = "com.sozonext.inntouch.action.SIP_UNREGISTER"
 
         const val ACTION_SIP_AUDIO_DEVICE_UPDATE: String = "com.sozonext.inntouch.action.ACTION_SIP_AUDIO_DEVICE_UPDATE"
 
@@ -63,36 +75,49 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
     }
 
-    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
+    @SuppressLint("ForegroundServiceType")
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val result = super.onStartCommand(intent, flags, startId)
-        when (intent.action) {
-            // ACTION_SIP_REGISTER
-            ACTION_SIP_REGISTER -> {
-                if (!CallManager.instance().isOnline) {
-                    initial()
+
+
+        val channel = NotificationChannel(
+            "com.sozonext.inntouch.service",
+            "PortSip Service Channel",
+            NotificationManager.IMPORTANCE_LOW
+        )
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(channel)
+
+        val notification = NotificationCompat.Builder(this, "com.sozonext.inntouch.service")
+            .setContentTitle("PortSip Service")
+            .setContentText("PortSip service is running")
+            .build()
+
+        startForeground(1, notification)
+
+        if (intent != null) {
+            when (intent.action) {
+                ACTION_SIP_REGISTER -> {
+                    if (CallManager.getInstance().isOnline) {
+                        unregister()
+                    }
                     register()
                 }
-            }
-            // ACTION_SIP_UNREGISTER
-            ACTION_SIP_UNREGISTER -> {
-                if (CallManager.instance().isOnline) {
-                    unregister()
+                // ACTION_PUSH_TOKEN
+                ACTION_PUSH_TOKEN -> {
                 }
-            }
-            // ACTION_PUSH_TOKEN
-            ACTION_PUSH_TOKEN -> {
-            }
-            // ACTION_PUSH_MESSAGE
-            ACTION_PUSH_MESSAGE -> {
+                // ACTION_PUSH_MESSAGE
+                ACTION_PUSH_MESSAGE -> {
+                }
             }
         }
         return result
     }
 
-    private fun initial(): Int {
+    private fun register() {
         portSipSdk.setOnPortSIPEvent(this)
 
-        CallManager.instance().isOnline = true
+        CallManager.getInstance().isOnline = true
 
         val externalFilesPath = getExternalFilesDir(null)!!.absolutePath
         val tlsCertificatesRootPath = "$externalFilesPath/certs"
@@ -101,21 +126,17 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         var result = portSipSdk.initialize(
             ENUM_TRANSPORT_UDP, "0.0.0.0", localSIPPort, PortSipEnumDefine.ENUM_LOG_LEVEL_DEBUG, externalFilesPath, 8, "PortSIP SDK for Android", 0, 0, tlsCertificatesRootPath, "", false, null
         )
+
         if (result != PortSipErrorcode.ECoreErrorNone) {
-            CallManager.instance().resetAll()
+            CallManager.getInstance().resetAll()
         } else {
-            result = portSipSdk.setLicenseKey("LicenseKey")
+            result = portSipSdk.setLicenseKey("HO1KH-5ZQ8W-BJSZC-NIDRI-TH5UD")
             if (result == PortSipErrorcode.ECoreWrongLicenseKey) {
                 log("The wrong license key was detected, please check with sales@portsip.com or support@portsip.com")
             } else if (result == PortSipErrorcode.ECoreTrialVersionLicenseKey) {
                 log("This Is Trial Version")
-                // portSipSdk.setInstanceId(getInstanceID())
             }
         }
-        return result
-    }
-
-    private fun register() {
 
         val sipServer: String = runBlocking {
             DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.SIP_SERVER).first().toString()
@@ -131,7 +152,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         }
 
         portSipSdk.removeUser()
-        var result = portSipSdk.setUser(
+        result = portSipSdk.setUser(
             exceptionNumber,
             exceptionNumber,
             exceptionNumber,
@@ -147,7 +168,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
         if (result != PortSipErrorcode.ECoreErrorNone) {
             log("setUser failure ErrorCode = $result")
-            CallManager.instance().resetAll()
+            CallManager.getInstance().resetAll()
             return
         }
 
@@ -171,38 +192,45 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         if (result != PortSipErrorcode.ECoreErrorNone) {
             log("registerServer failure ErrorCode =$result")
             portSipSdk.unRegisterServer(100)
-            CallManager.instance().resetAll()
+            CallManager.getInstance().resetAll()
         }
     }
 
     private fun unregister() {
-        if (CallManager.instance().isOnline) {
-            portSipSdk.unRegisterServer(100)
-            portSipSdk.removeUser()
-            portSipSdk.unInitialize()
-            CallManager.instance().isOnline = false
-            CallManager.instance().isRegistered = false
-        }
+        portSipSdk.unRegisterServer(100)
+        portSipSdk.removeUser()
+        portSipSdk.unInitialize()
+        CallManager.getInstance().isOnline = false
+        CallManager.getInstance().isRegistered = false
+    }
+
+    override fun onCreate() {
+        super.onCreate()
     }
 
     override fun onBind(p0: Intent): IBinder? {
-        Log.d(tag, "onInviteIncoming: $p0")
         log("onInviteIncoming: $p0")
         return null
     }
 
     override fun onRegisterSuccess(p0: String, p1: Int, p2: String) {
-        Log.d(tag, "onRegisterSuccess: $p0, $p1, $p2")
         log("onRegisterSuccess: $p0, $p1, $p2")
+        CallManager.getInstance().isRegistered = true
+        // ToDo
     }
 
     override fun onRegisterFailure(p0: String, p1: Int, p2: String) {
-        Log.d(tag, "onRegisterFailure: $p0, $p1, $p2")
         log("onRegisterFailure: $p0, $p1, $p2")
+        CallManager.getInstance().isRegistered = false
+        // ToDo
     }
 
-    override fun onInviteIncoming(p0: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: String, p7: Boolean, p8: Boolean, p9: String) {
-        log("onInviteIncoming: $p0, $p1, $p2, $p3, $p4, $p5, $p6, $p7, $p8, $p9")
+    override fun onInviteIncoming(sessionId: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: String, p7: Boolean, p8: Boolean, p9: String) {
+        log("onInviteIncoming: $sessionId, $p1, $p2, $p3, $p4, $p5, $p6, $p7, $p8, $p9")
+        if (CallManager.getInstance().findIncomingCall() != null) {
+            portSipSdk.rejectCall(sessionId, 486)
+            return
+        }
     }
 
     override fun onInviteTrying(p0: Long) {
@@ -219,10 +247,23 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
     override fun onInviteAnswered(p0: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: String, p7: Boolean, p8: Boolean, p9: String) {
         log("onInviteAnswered: $p0, $p1, $p2, $p3, $p4, $p5, $p6, $p7, $p8, $p9")
+        val intent = Intent(ACTION_INVITE_ANSWERED)
+        this.sendBroadcast(intent)
     }
 
-    override fun onInviteFailure(p0: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: Int, p7: String) {
-        log("onInviteFailure: $p0, $p1, $p2, $p3, $p4, $p5, $p6, $p7")
+    override fun onInviteFailure(sessionId: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: Int, p7: String) {
+        log("onInviteFailure: $sessionId, $p1, $p2, $p3, $p4, $p5, $p6, $p7")
+
+        Ring.getInstance(this).stopOutgoingTone()
+
+        val session: Session = CallManager.getInstance().findSessionBySessionId(sessionId) ?: return
+        session.state = CallStateFlag.FAILED
+        session.sessionId = sessionId
+
+        val intent = Intent("com.sozonext.PORTSIP_JS_CALL")
+        intent.putExtra("jsFunction", "onIncomingCall('1234')")
+        this.sendBroadcast(intent)
+
     }
 
     override fun onInviteUpdated(p0: Long, p1: String, p2: String, p3: String, p4: Boolean, p5: Boolean, p6: Boolean, p7: String) {
@@ -231,6 +272,11 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
     override fun onInviteConnected(p0: Long) {
         log("onInviteConnected: $p0")
+
+        Ring.getInstance(this).stopOutgoingTone()
+        val intent = Intent(ACTION_INVITE_ANSWERED)
+        Log.d(tag, "onInviteConnected: Sending broadcast with action: ${intent.action}")
+        this.sendBroadcast(intent)
     }
 
     override fun onInviteBeginingForward(p0: String) {
@@ -391,7 +437,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
     private fun log(message: String) {
         Log.d(tag, message)
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        // Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
 }

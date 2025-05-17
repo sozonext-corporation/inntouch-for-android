@@ -2,7 +2,6 @@ package com.sozonext.inntouch.utils
 
 import android.content.Context
 import android.util.Log
-import androidx.appcompat.app.AppCompatActivity
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -16,7 +15,7 @@ import java.io.IOException
 
 class DataStoreUtils(private val context: Context) {
 
-    private val tag: String = AppCompatActivity::class.java.simpleName
+    private val tag: String = context.packageName
 
     companion object {
         private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")

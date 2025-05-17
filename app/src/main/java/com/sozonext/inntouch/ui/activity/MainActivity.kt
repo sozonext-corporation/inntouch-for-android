@@ -1,10 +1,14 @@
 package com.sozonext.inntouch.ui.activity
 
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.PermissionRequest
@@ -19,21 +23,27 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.sozonext.inntouch.R
+import com.sozonext.inntouch.service.PortSipService
+import com.sozonext.inntouch.service.PortSipService.Companion.ACTION_INVITE_ANSWERED
 import com.sozonext.inntouch.ui.JavaScriptInterface
 import com.sozonext.inntouch.utils.DataStoreUtils
 import com.sozonext.inntouch.utils.KioskUtils
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlin.math.log
 
 class MainActivity : AppCompatActivity(), View.OnClickListener {
+
+    private val tag: String = MainActivity::class.java.simpleName
 
     private lateinit var webView: WebView
 
     private var counter = 0
     private val handler = Handler(Looper.getMainLooper())
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint("SetJavaScriptEnabled", "UnspecifiedRegisterReceiverFlag")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -51,6 +61,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         webView.settings.javaScriptEnabled = true
         webView.settings.mediaPlaybackRequiresUserGesture = false
         webView.addJavascriptInterface(JavaScriptInterface(this), "Android")
+
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
@@ -92,6 +103,48 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             webView.loadUrl(startUrl)
         } else {
             launchQRCodeActivity()
+        }
+    }
+
+
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    override fun onResume() {
+        super.onResume()
+        Log.d(tag,"onResume(): $ACTION_INVITE_ANSWERED")
+        val filter = IntentFilter().apply {
+            addAction(ACTION_INVITE_ANSWERED)
+            addAction("com.example.ACTION_CALL_ENDED")
+        }
+        ContextCompat.registerReceiver(
+            this,
+            broadcastReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        Log.d(tag, "onResume: BroadcastReceiver registered.")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        unregisterReceiver(broadcastReceiver)
+        Log.d(tag, "onPause: BroadcastReceiver unregistered.")
+    }
+
+    private val broadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d(tag,"javascript:$intent")
+            if (intent == null) return
+            when (intent.action) {
+                ACTION_INVITE_ANSWERED -> {
+                    Log.d(tag,"javascript:onInviteAnswered()")
+                    webView.evaluateJavascript("javascript:onInviteAnswered()", null)
+                }
+                "com.example.ACTION_CALL_ENDED" -> {
+                    val callId = intent.getStringExtra("callId") ?: ""
+                    webView.evaluateJavascript("javascript:onCallEnded('$callId')", null)
+                }
+                // 他のイベントもここに追加可能
+            }
         }
     }
 

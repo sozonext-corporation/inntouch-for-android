@@ -1,5 +1,8 @@
 package com.sozonext.inntouch.utils.portsip
 
+import android.annotation.SuppressLint
+import android.content.Context
+import android.telecom.Call
 import com.portsip.PortSIPVideoRenderer
 import com.portsip.PortSipEnumDefine
 import com.portsip.PortSipSdk
@@ -8,19 +11,15 @@ class CallManager() {
 
     companion object {
         const val MAX_LINES = 10
-        private var mInstance: CallManager? = null
-        private val locker = Any()
 
-        fun instance(): CallManager {
-            if (mInstance == null) {
-                synchronized(locker) {
-                    if (mInstance == null) {
-                        mInstance = CallManager()
-                    }
-                }
+        @SuppressLint("StaticFieldLeak")
+        @Volatile
+        private var instance: CallManager? = null
+        fun getInstance(): CallManager =
+            instance ?: synchronized(this) {
+                instance ?: CallManager().also { instance = it }
             }
-            return mInstance!!
-        }
+
     }
 
     private var currentLine: Int = 0
@@ -52,18 +51,18 @@ class CallManager() {
 
     fun hangupAllCalls(sdk: PortSipSdk) {
         for (session in sessions) {
-            if (session.sessionID > Session.INVALID_SESSION_ID) {
-                sdk.hangUp(session.sessionID)
+            if (session.sessionId > Session.INVALID_SESSION_ID) {
+                sdk.hangUp(session.sessionId)
             }
         }
     }
 
     fun hasActiveSession(): Boolean {
-        return sessions.any { it.sessionID > Session.INVALID_SESSION_ID }
+        return sessions.any { it.sessionId > Session.INVALID_SESSION_ID }
     }
 
-    fun findSessionBySessionID(sessionID: Long): Session? {
-        return sessions.find { it.sessionID == sessionID }
+    fun findSessionBySessionId(sessionId: Long): Session? {
+        return sessions.find { it.sessionId == sessionId }
     }
 
     fun findIdleSession(): Session? {
@@ -86,12 +85,12 @@ class CallManager() {
 
     fun addActiveSessionToConference(sdk: PortSipSdk) {
         for (session in sessions) {
-            if (session.state == Session.CallStateFlag.CONNECTED) {
-                sdk.setRemoteScreenWindow(session.sessionID, null)
-                sdk.setRemoteVideoWindow(session.sessionID, null)
-                sdk.joinToConference(session.sessionID)
-                sdk.sendVideo(session.sessionID, true)
-                sdk.unHold(session.sessionID)
+            if (session.state == CallStateFlag.CONNECTED) {
+                sdk.setRemoteScreenWindow(session.sessionId, null)
+                sdk.setRemoteVideoWindow(session.sessionId, null)
+                sdk.joinToConference(session.sessionId)
+                sdk.sendVideo(session.sessionId, true)
+                sdk.unHold(session.sessionId)
             }
         }
     }
@@ -99,8 +98,8 @@ class CallManager() {
     fun setRemoteVideoWindow(sdk: PortSipSdk, sessionId: Long, renderer: PortSIPVideoRenderer?) {
         sdk.setConferenceVideoWindow(null)
         for (session in sessions) {
-            if (session.state == Session.CallStateFlag.CONNECTED && session.sessionID != sessionId) {
-                sdk.setRemoteVideoWindow(session.sessionID, null)
+            if (session.state == CallStateFlag.CONNECTED && session.sessionId != sessionId) {
+                sdk.setRemoteVideoWindow(session.sessionId, null)
             }
         }
         sdk.setRemoteVideoWindow(sessionId, renderer)
@@ -109,8 +108,8 @@ class CallManager() {
     fun setShareVideoWindow(sdk: PortSipSdk, sessionId: Long, renderer: PortSIPVideoRenderer?) {
         sdk.setConferenceVideoWindow(null)
         for (session in sessions) {
-            if (session.state == Session.CallStateFlag.CONNECTED && session.sessionID != sessionId) {
-                sdk.setRemoteScreenWindow(session.sessionID, null)
+            if (session.state == CallStateFlag.CONNECTED && session.sessionId != sessionId) {
+                sdk.setRemoteScreenWindow(session.sessionId, null)
             }
         }
         sdk.setRemoteScreenWindow(sessionId, renderer)
@@ -118,9 +117,9 @@ class CallManager() {
 
     fun setConferenceVideoWindow(sdk: PortSipSdk, renderer: PortSIPVideoRenderer?) {
         for (session in sessions) {
-            if (session.state == Session.CallStateFlag.CONNECTED) {
-                sdk.setRemoteVideoWindow(session.sessionID, null)
-                sdk.setRemoteScreenWindow(session.sessionID, null)
+            if (session.state == CallStateFlag.CONNECTED) {
+                sdk.setRemoteVideoWindow(session.sessionId, null)
+                sdk.setRemoteScreenWindow(session.sessionId, null)
             }
         }
         sdk.setConferenceVideoWindow(renderer)
@@ -134,7 +133,7 @@ class CallManager() {
 
     fun findIncomingCall(): Session? {
         return sessions.find {
-            it.sessionID != Session.INVALID_SESSION_ID && it.state == Session.CallStateFlag.INCOMING
+            it.sessionId != Session.INVALID_SESSION_ID && it.state == CallStateFlag.INCOMING
         }
     }
 

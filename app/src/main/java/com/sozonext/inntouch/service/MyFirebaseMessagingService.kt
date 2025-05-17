@@ -5,13 +5,6 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
-    override fun onCreate() {
-        super.onCreate()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-    }
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         //super.onMessageReceived(remoteMessage);
@@ -33,8 +26,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         }
     }
 
-    override fun onNewToken(s: String) {
-        sendRegistrationToServer(s)
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
     }
 
 

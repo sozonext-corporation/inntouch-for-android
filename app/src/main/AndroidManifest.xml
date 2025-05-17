@@ -17,15 +17,18 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <!--keep app alive in background-->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <application
         android:name=".application.MyApplication"
         android:allowBackup="true"
@@ -38,9 +41,6 @@
         android:theme="@style/Theme.InnTouchApp"
         tools:targetApi="31">
         <activity
-            android:name=".ui.activity.WebRtcActivity"
-            android:exported="false" />
-        <activity
             android:name=".ui.activity.MainActivity"
             android:exported="true">
             <intent-filter>
@@ -50,14 +50,24 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".ui.activity.MenuActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.activity.QRCodeScannerActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.activity.MenuActivity"
+            android:name=".ui.activity.WebRtcActivity"
             android:exported="false" />
+
         <service
             android:name=".service.PortSipService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="phoneCall|remoteMessaging|microphone"
+            tools:ignore="ForegroundServicePermission">
+            <intent-filter>
+                <action android:name="com.sozonext.inntouch.action.SIP_REGISTER" />
+            </intent-filter>
+        </service>
         <receiver
             android:name=".MyDeviceAdminReceiver"
             android:exported="true"
@@ -65,7 +75,6 @@
             <meta-data
                 android:name="android.app.device_admin"
                 android:resource="@xml/device_admin" />
-
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>

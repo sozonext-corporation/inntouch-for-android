@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 
-class PortMessageReceiver : BroadcastReceiver() {
+class PortSipBroadcastReceiver : BroadcastReceiver() {
 
     lateinit var broadcastReceiver: BroadcastListener
 
