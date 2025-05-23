@@ -6,7 +6,7 @@ import android.content.Intent
 
 class PortSipBroadcastReceiver : BroadcastReceiver() {
 
-    lateinit var broadcastReceiver: BroadcastListener
+    private lateinit var broadcastReceiver: BroadcastListener
 
     interface BroadcastListener {
         fun onBroadcastReceiver(intent: Intent)

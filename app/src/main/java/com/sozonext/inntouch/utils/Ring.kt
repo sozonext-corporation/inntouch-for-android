@@ -1,4 +1,4 @@
-package com.sozonext.inntouch.utils.portsip
+package com.sozonext.inntouch.utils
 
 import android.annotation.SuppressLint
 import android.content.Context

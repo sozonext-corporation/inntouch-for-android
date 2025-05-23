@@ -2,6 +2,13 @@ package com.sozonext.inntouch.ui
 
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiManager
+import android.os.BatteryManager
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.widget.Toast
@@ -9,12 +16,12 @@ import com.portsip.PortSipEnumDefine
 import com.sozonext.inntouch.application.MyApplication
 import com.sozonext.inntouch.service.PortSipService
 import com.sozonext.inntouch.utils.DataStoreUtils
-import com.sozonext.inntouch.utils.portsip.CallManager
-import com.sozonext.inntouch.utils.portsip.CallStateFlag.CONNECTED
-import com.sozonext.inntouch.utils.portsip.CallStateFlag.INCOMING
-import com.sozonext.inntouch.utils.portsip.CallStateFlag.TRYING
-import com.sozonext.inntouch.utils.portsip.Ring
-import com.sozonext.inntouch.utils.portsip.Session
+import com.sozonext.inntouch.utils.Ring
+import com.sozonext.inntouch.utils.Session
+import com.sozonext.inntouch.utils.SessionManager
+import com.sozonext.inntouch.utils.SessionStatus.CONNECTED
+import com.sozonext.inntouch.utils.SessionStatus.INCOMING
+import com.sozonext.inntouch.utils.SessionStatus.TRYING
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 
@@ -62,23 +69,31 @@ class JavaScriptInterface(private val context: Context) {
             return false
         }
         portSipSdk.sendVideo(sessionId, true)
+
+        val session: Session = SessionManager.getInstance().getCurrentSession() ?: return false
+
+        val extensionDisplayName = ""
+
+        session.sessionStatus = TRYING
+        session.sessionId = sessionId
+        session.targetExtensionNumber = extensionNumber
+        session.targetExtensionDisplayName = extensionDisplayName
         return true
     }
 
     @JavascriptInterface
     fun answer(): Boolean {
-
         Log.d(tag, "answer()")
 
-        val currentSession = CallManager.getInstance().getCurrentSession() ?: return false
+        Ring.getInstance(context).stopIncomingTone()
 
-        if (currentSession.state !== INCOMING) {
-            Toast.makeText(context, "No incoming call on current line, please switch a line.", Toast.LENGTH_SHORT).show()
+        val currentSession = SessionManager.getInstance().getCurrentSession() ?: return false
+
+        if (currentSession.sessionStatus !== INCOMING) {
             return false
         }
 
-        currentSession.state = CONNECTED
-        Ring.getInstance(context).stopIncomingTone()
+        currentSession.sessionStatus = CONNECTED
 
         val result = portSipSdk.answerCall(currentSession.sessionId, false)
         if (result != 0) {
@@ -90,15 +105,15 @@ class JavaScriptInterface(private val context: Context) {
     }
 
     @JavascriptInterface
-    fun hangUp(): Boolean {
+    fun hangUp() {
         Log.d(tag, "hangUp()")
 
-        val currentSession = CallManager.getInstance().getCurrentSession() ?: return true
-
+        // Stop Tone
         Ring.getInstance(context).stopIncomingTone()
         Ring.getInstance(context).stopOutgoingTone()
 
-        when (currentSession.state) {
+        val currentSession = SessionManager.getInstance().getCurrentSession() ?: return
+        when (currentSession.sessionStatus) {
             INCOMING -> {
                 portSipSdk.rejectCall(currentSession.sessionId, 486)
             }
@@ -109,25 +124,23 @@ class JavaScriptInterface(private val context: Context) {
 
             else -> {}
         }
-
-        return true
+        currentSession.reset()
     }
 
     @JavascriptInterface
     fun mute(enable: Boolean): Boolean {
         Log.d(tag, "mute($enable)")
-
-        val currentSession = CallManager.getInstance().getCurrentSession() ?: return false
+        val currentSession = SessionManager.getInstance().getCurrentSession() ?: return false
         currentSession.let { session ->
-            if (session.state == CONNECTED) {
-                currentSession.isHold = enable
+            if (session.sessionStatus == CONNECTED) {
+                currentSession.isMute = enable
                 if (enable) {
                     portSipSdk.muteSession(
-                        currentSession.sessionId, false, false, false, false
+                        currentSession.sessionId, true, true, true, true
                     )
                 } else {
                     portSipSdk.muteSession(
-                        currentSession.sessionId, true, true, true, true
+                        currentSession.sessionId, false, false, false, false
                     )
                 }
             }
@@ -138,10 +151,9 @@ class JavaScriptInterface(private val context: Context) {
     @JavascriptInterface
     fun hold(enable: Boolean): Boolean {
         Log.d(tag, "hold($enable)")
-
-        val currentSession = CallManager.getInstance().getCurrentSession() ?: return false
+        val currentSession = SessionManager.getInstance().getCurrentSession() ?: return false
         currentSession.let { session ->
-            if (session.state == CONNECTED) {
+            if (session.sessionStatus == CONNECTED) {
                 currentSession.isHold = enable
                 if (enable) {
                     portSipSdk.hold(session.sessionId)
@@ -151,21 +163,65 @@ class JavaScriptInterface(private val context: Context) {
             }
         }
         return true
-
     }
 
     @JavascriptInterface
     fun getCurrentSession(): String {
         Log.d(tag, "getCurrentSession()")
-        val currentSession = CallManager.getInstance().getCurrentSession()
+        val currentSession = SessionManager.getInstance().getCurrentSession()
         val json = if (currentSession != null) {
             JSONObject().apply {
-                put("targetExtensionName", currentSession.targetExtensionName)
+                put("targetExtensionDisplayName", currentSession.targetExtensionDisplayName)
             }.toString()
         } else {
             "{}"
         }
         return json
+    }
+
+    @JavascriptInterface
+    fun getBatteryChargingStatus(): Boolean {
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val batteryStatus: Intent? = context.registerReceiver(null, filter)
+        val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: return false
+        return status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+    }
+
+    @JavascriptInterface
+    fun getUsbAttachingStatus(): Boolean {
+        val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
+        val deviceList: HashMap<String, UsbDevice> = usbManager.deviceList
+        return deviceList.isNotEmpty()
+    }
+
+    @JavascriptInterface
+    fun getBatteryLevel(): Int {
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val intent: Intent? = context.registerReceiver(null, filter)
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        return if (level >= 0 && scale > 0) (level * 100) / scale else -1
+    }
+
+    @JavascriptInterface
+    fun getWifiLevel(): Int {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return -1
+        val network = connectivityManager.activeNetwork ?: return -1
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return -1
+        if (!capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return -1
+
+        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return -1
+
+        @Suppress("DEPRECATION")
+        val rssi = wifiManager.connectionInfo.rssi
+
+        return when {
+            rssi >= -50 -> 4
+            rssi >= -60 -> 3
+            rssi >= -70 -> 2
+            rssi >= -80 -> 1
+            else -> 0
+        }
     }
 
 }

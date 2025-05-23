@@ -5,10 +5,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.hardware.usb.UsbManager
+import android.media.AudioManager
+import android.os.BatteryManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.PermissionRequest
@@ -23,16 +28,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import com.sozonext.inntouch.R
 import com.sozonext.inntouch.service.PortSipService
-import com.sozonext.inntouch.service.PortSipService.Companion.ACTION_INVITE_ANSWERED
+import com.sozonext.inntouch.service.PortSipService.Companion.EXTRA_TARGET_EXTENSION_DISPLAY_NAME
 import com.sozonext.inntouch.ui.JavaScriptInterface
 import com.sozonext.inntouch.utils.DataStoreUtils
 import com.sozonext.inntouch.utils.KioskUtils
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import kotlin.math.log
 
 class MainActivity : AppCompatActivity(), View.OnClickListener {
 
@@ -101,49 +104,71 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         }
         if (startUrl.isNotEmpty()) {
             webView.loadUrl(startUrl)
+            webView.requestFocus();
         } else {
             launchQRCodeActivity()
         }
     }
 
-
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onResume() {
         super.onResume()
-        Log.d(tag,"onResume(): $ACTION_INVITE_ANSWERED")
         val filter = IntentFilter().apply {
-            addAction(ACTION_INVITE_ANSWERED)
-            addAction("com.example.ACTION_CALL_ENDED")
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+            addAction(PortSipService.ACTION_ON_INVITE_ANSWERED)
+            addAction(PortSipService.ACTION_ON_INCOMING_CALL)
+            addAction(PortSipService.ACTION_ON_REJECT)
         }
-        ContextCompat.registerReceiver(
-            this,
-            broadcastReceiver,
-            filter,
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        Log.d(tag, "onResume: BroadcastReceiver registered.")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(broadcastReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(broadcastReceiver, filter)
+        }
     }
 
     override fun onPause() {
         super.onPause()
         unregisterReceiver(broadcastReceiver)
-        Log.d(tag, "onPause: BroadcastReceiver unregistered.")
     }
 
     private val broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            Log.d(tag,"javascript:$intent")
             if (intent == null) return
             when (intent.action) {
-                ACTION_INVITE_ANSWERED -> {
-                    Log.d(tag,"javascript:onInviteAnswered()")
+                PortSipService.ACTION_ON_INVITE_ANSWERED -> {
+                    Log.d(tag, "onInviteAnswered()")
                     webView.evaluateJavascript("javascript:onInviteAnswered()", null)
                 }
-                "com.example.ACTION_CALL_ENDED" -> {
-                    val callId = intent.getStringExtra("callId") ?: ""
-                    webView.evaluateJavascript("javascript:onCallEnded('$callId')", null)
+
+                PortSipService.ACTION_ON_INCOMING_CALL -> {
+                    Log.d(tag, "onIncomingCall()")
+                    val callerDisplayName = intent.getStringExtra(EXTRA_TARGET_EXTENSION_DISPLAY_NAME)
+                    webView.evaluateJavascript("javascript:onIncomingCall('$callerDisplayName')", null)
                 }
-                // 他のイベントもここに追加可能
+
+                PortSipService.ACTION_ON_REJECT -> {
+                    Log.d(tag, "onReject()")
+                    webView.evaluateJavascript("javascript:onReject()", null)
+                }
+
+                Intent.ACTION_BATTERY_CHANGED -> {
+                    Log.d(tag, "onBatteryChargingStatusChanged()")
+                    intent.let {
+                        val status = it.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+                        webView.evaluateJavascript("javascript:onBatteryChargingStatusChanged(${isCharging})", null)
+                    }
+                }
+                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                    Log.d(tag, "onUsbAttachingStatusChanged(true)")
+                    webView.evaluateJavascript("javascript:onUsbAttachingStatusChanged(true)", null)
+                }
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                    Log.d(tag, "onUsbAttachingStatusChanged(false)")
+                    webView.evaluateJavascript("javascript:onUsbAttachingStatusChanged(false)", null)
+                }
             }
         }
     }
@@ -205,6 +230,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.START_URL).first().toString()
         }
         webView.loadUrl(startUrl)
+        webView.requestFocus();
     }
 
     private fun navigateConfigUrl() {
@@ -212,6 +238,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.CONFIG_URL).first().toString()
         }
         webView.loadUrl(startUrl)
+        webView.requestFocus();
     }
 
     private fun launchQRCodeActivity() {

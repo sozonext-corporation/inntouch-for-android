@@ -1,13 +1,13 @@
 package com.sozonext.inntouch.service
 
 import android.annotation.SuppressLint
-import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.IBinder
+import android.os.PowerManager
 import android.text.TextUtils
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -18,10 +18,10 @@ import com.portsip.PortSipErrorcode
 import com.sozonext.inntouch.application.MyApplication
 import com.sozonext.inntouch.receiver.NetWorkReceiver
 import com.sozonext.inntouch.utils.DataStoreUtils
-import com.sozonext.inntouch.utils.portsip.CallManager
-import com.sozonext.inntouch.utils.portsip.CallStateFlag
-import com.sozonext.inntouch.utils.portsip.Ring
-import com.sozonext.inntouch.utils.portsip.Session
+import com.sozonext.inntouch.utils.Ring
+import com.sozonext.inntouch.utils.Session
+import com.sozonext.inntouch.utils.SessionManager
+import com.sozonext.inntouch.utils.SessionStatus
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.util.Random
@@ -40,12 +40,12 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         const val ACTION_SIP_REGISTER: String = "com.sozonext.inntouch.action.SIP_REGISTER"
         const val ACTION_SIP_UNREGISTER: String = "com.sozonext.inntouch.action.SIP_UNREGISTER"
 
-        const val ACTION_INVITE_ANSWERED: String = "com.sozonext.inntouch.action.ACTION_INVITE_ANSWERED"
+        const val ACTION_ON_INVITE_ANSWERED: String = "com.sozonext.inntouch.action.ACTION_ON_INVITE_ANSWERED"
+        const val ACTION_ON_INCOMING_CALL: String = "com.sozonext.inntouch.action.ACTION_ON_INCOMING_CALL"
+        const val ACTION_ON_REJECT: String = "com.sozonext.inntouch.action.ACTION_ON_REJECT"
 
         const val ACTION_PUSH_TOKEN: String = "com.sozonext.inntouch.action.PUSH_TOKEN"
         const val ACTION_PUSH_MESSAGE: String = "com.sozonext.inntouch.action.PUSH_MESSAGE"
-
-        // const val ACTION_SIP_UNREGISTER: String = "com.sozonext.inntouch.action.SIP_UNREGISTER"
 
         const val ACTION_SIP_AUDIO_DEVICE_UPDATE: String = "com.sozonext.inntouch.action.ACTION_SIP_AUDIO_DEVICE_UPDATE"
 
@@ -64,10 +64,9 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         const val REGISTER_CHANGE_ACTION: String = "PortSip.AndroidSample.Test.RegisterStatusChange"
         const val CALL_CHANGE_ACTION: String = "PortSip.AndroidSample.Test.CallStatusChange"
         const val PRESENCE_CHANGE_ACTION: String = "PortSip.AndroidSample.Test.PRESENCEStatusChange"
-        const val EXTRA_REGISTER_STATE: String = "RegisterStatus"
-        const val EXTRA_CALL_SESSION_ID: String = "SessionID"
-        const val EXTRA_CALL_DESCRIPTION: String = "Description"
-        const val EXTRA_PUSH_TOKEN: String = "token"
+
+        const val EXTRA_PUSH_TOKEN: String = "com.sozonext.inntouch.action.EXTRA_PUSH_TOKEN"
+        const val EXTRA_TARGET_EXTENSION_DISPLAY_NAME: String = "com.sozonext.inntouch.action.EXTRA_TARGET_EXTENSION_DISPLAY_NAME"
 
         fun startServiceCompatibility(context: Context, intent: Intent) {
             context.startForegroundService(intent)
@@ -78,7 +77,6 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
     @SuppressLint("ForegroundServiceType")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val result = super.onStartCommand(intent, flags, startId)
-
 
         val channel = NotificationChannel(
             "com.sozonext.inntouch.service",
@@ -98,7 +96,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         if (intent != null) {
             when (intent.action) {
                 ACTION_SIP_REGISTER -> {
-                    if (CallManager.getInstance().isOnline) {
+                    if (SessionManager.getInstance().isOnline) {
                         unregister()
                     }
                     register()
@@ -114,10 +112,292 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         return result
     }
 
+    /**
+     * onBind
+     */
+    override fun onBind(p0: Intent): IBinder? {
+        return null
+    }
+
+    /**
+     * onRegisterSuccess
+     */
+    override fun onRegisterSuccess(p0: String, p1: Int, p2: String) {
+        Log.d(tag, "onRegisterSuccess: $p0, $p1, $p2")
+        SessionManager.getInstance().isRegistered = true
+        // ToDo
+    }
+
+    /**
+     * onRegisterFailure
+     */
+    override fun onRegisterFailure(p0: String, p1: Int, p2: String) {
+        Log.d(tag, "onRegisterFailure: $p0, $p1, $p2")
+        SessionManager.getInstance().isRegistered = false
+        // ToDo
+    }
+
+    /**
+     * onInviteIncoming
+     */
+    override fun onInviteIncoming(sessionId: Long, callerDisplayName: String, caller: String, p3: String, p4: String, p5: String, p6: String, p7: Boolean, p8: Boolean, p9: String) {
+        Log.d(tag, "onInviteIncoming: $sessionId, $callerDisplayName, $caller")
+
+        if (SessionManager.getInstance().findIncomingCall() != null) {
+            portSipSdk.rejectCall(sessionId, 486)
+            return
+        }
+
+        Ring.getInstance(this).startIncomingTone()
+
+        val session: Session = SessionManager.getInstance().findIdleSession() ?: return
+        session.sessionStatus = SessionStatus.INCOMING
+        session.sessionId = sessionId
+        session.targetExtensionNumber = caller
+        session.targetExtensionDisplayName = callerDisplayName
+
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val wakeLock = powerManager.newWakeLock(
+            PowerManager.FULL_WAKE_LOCK or
+                    PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                    PowerManager.ON_AFTER_RELEASE,
+            "MyApp:WakeLockTag"
+        )
+        wakeLock.acquire(3000L)
+        Thread.sleep(1000)
+        val intent = Intent(ACTION_ON_INCOMING_CALL)
+        intent.setPackage(packageName)
+        intent.putExtra(EXTRA_TARGET_EXTENSION_DISPLAY_NAME, callerDisplayName)
+        sendBroadcast(intent)
+
+        // ToDo
+    }
+
+    override fun onInviteTrying(p0: Long) {}
+
+    /**
+     * onInviteSessionProgress
+     */
+    override fun onInviteSessionProgress(sessionId: Long, p1: String, p2: String, existsEarlyMedia: Boolean, p4: Boolean, p5: Boolean, p6: String) {
+        val session: Session = SessionManager.getInstance().findSessionBySessionId(sessionId) ?: return
+        session.existsEarlyMedia = existsEarlyMedia
+    }
+
+    /**
+     * onInviteRinging
+     */
+    override fun onInviteRinging(sessionId: Long, p1: String, p2: Int, p3: String) {
+        val session: Session = SessionManager.getInstance().findSessionBySessionId(sessionId) ?: return
+        if (!session.existsEarlyMedia) {
+            Ring.getInstance(this).startOutgoingTone();
+        }
+    }
+
+    /**
+     * onInviteAnswered
+     */
+    override fun onInviteAnswered(sessionId: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: String, p7: Boolean, p8: Boolean, p9: String) {
+        Log.d(tag, "onInviteAnswered($sessionId)")
+
+        Ring.getInstance(this).stopOutgoingTone();
+
+        val session: Session = SessionManager.getInstance().findSessionBySessionId(sessionId) ?: return
+        session.sessionStatus = SessionStatus.CONNECTED
+
+        // ToDo
+    }
+
+    /**
+     * onInviteFailure
+     */
+    override fun onInviteFailure(sessionId: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: Int, p7: String) {
+
+        Ring.getInstance(this).stopOutgoingTone()
+
+        val session: Session = SessionManager.getInstance().findSessionBySessionId(sessionId) ?: return
+        session.sessionStatus = SessionStatus.FAILED
+        session.sessionId = sessionId
+
+        val intent = Intent(ACTION_ON_REJECT)
+        intent.setPackage(packageName)
+        sendBroadcast(intent)
+        // ToDo
+    }
+
+    /**
+     * onInviteUpdated
+     */
+    override fun onInviteUpdated(sessionId: Long, p1: String, p2: String, p3: String, p4: Boolean, p5: Boolean, p6: Boolean, p7: String) {
+
+        val session: Session = SessionManager.getInstance().findSessionBySessionId(sessionId) ?: return
+        session.sessionStatus = SessionStatus.CONNECTED
+
+        // ToDo
+    }
+
+    /**
+     * onInviteConnected
+     */
+    override fun onInviteConnected(sessionId: Long) {
+        Log.d(tag, "onInviteConnected($sessionId)")
+
+        val intent = Intent(ACTION_ON_INVITE_ANSWERED)
+        intent.setPackage(packageName)
+        sendBroadcast(intent)
+
+        val session: Session = SessionManager.getInstance().findSessionBySessionId(sessionId) ?: return
+        session.sessionStatus = SessionStatus.CONNECTED
+        session.sessionId = sessionId
+
+        // ToDo
+    }
+
+    override fun onInviteBeginingForward(p0: String) {}
+
+    /**
+     * onInviteClosed
+     */
+    override fun onInviteClosed(sessionId: Long, p1: String) {
+        Log.d(tag, "onInviteClosed: $sessionId, $p1")
+
+        Ring.getInstance(this).stopIncomingTone()
+
+        val session: Session = SessionManager.getInstance().findSessionBySessionId(sessionId) ?: return
+        session.sessionStatus = SessionStatus.CLOSED
+        session.sessionId = sessionId
+
+        val intent = Intent(ACTION_ON_REJECT)
+        intent.setPackage(packageName)
+        sendBroadcast(intent)
+
+        // ToDo
+    }
+
+    override fun onDialogStateUpdated(p0: String, p1: String, p2: String, p3: String) {}
+
+    override fun onRemoteHold(p0: Long) {}
+
+    override fun onRemoteUnHold(p0: Long, p1: String, p2: String, p3: Boolean, p4: Boolean) {}
+
+    override fun onReceivedRefer(p0: Long, p1: Long, p2: String, p3: String, p4: String) {}
+
+    /**
+     * onReferAccepted
+     */
+    override fun onReferAccepted(p0: Long) {
+        Log.d(tag, "onReferAccepted: $p0")
+        // ToDo
+    }
+
+    override fun onReferRejected(p0: Long, p1: String, p2: Int) {}
+
+    override fun onTransferTrying(p0: Long) {}
+
+    override fun onTransferRinging(p0: Long) {}
+
+    /**
+     * onACTVTransferSuccess
+     */
+    override fun onACTVTransferSuccess(p0: Long) {
+        Log.d(tag, "onACTVTransferSuccess: $p0")
+        // ToDo
+    }
+
+    /**
+     * onACTVTransferFailure
+     */
+    override fun onACTVTransferFailure(p0: Long, p1: String, p2: Int) {
+        Log.d(tag, "onACTVTransferFailure: $p0, $p1, $p2")
+        // ToDo
+    }
+
+    override fun onReceivedSignaling(p0: Long, p1: String) {}
+
+    override fun onSendingSignaling(p0: Long, p1: String) {}
+
+    override fun onWaitingVoiceMessage(p0: String, p1: Int, p2: Int, p3: Int, p4: Int) {}
+
+    override fun onWaitingFaxMessage(p0: String, p1: Int, p2: Int, p3: Int, p4: Int) {}
+
+    override fun onRecvDtmfTone(p0: Long, p1: Int) {}
+
+    override fun onRecvOptions(p0: String) {}
+
+    override fun onRecvInfo(p0: String) {}
+
+    override fun onRecvNotifyOfSubscription(p0: Long, p1: String, p2: ByteArray, p3: Int) {}
+
+    /**
+     * onPresenceRecvSubscribe
+     */
+    override fun onPresenceRecvSubscribe(p0: Long, p1: String, p2: String, p3: String) {
+        Log.d(tag, "onPresenceRecvSubscribe: $p0, $p1, $p2, $p3")
+    }
+
+    /**
+     * onPresenceOnline
+     */
+    override fun onPresenceOnline(p0: String, p1: String, p2: String) {
+        Log.d(tag, "onPresenceOnline: $p0, $p1, $p2")
+    }
+
+    /**
+     * onPresenceOffline
+     */
+    override fun onPresenceOffline(p0: String, p1: String) {
+        Log.d(tag, "onPresenceOffline: $p0, $p1")
+    }
+
+    override fun onRecvMessage(p0: Long, p1: String, p2: String, p3: ByteArray, p4: Int) {}
+
+    override fun onRecvOutOfDialogMessage(p0: String, p1: String, p2: String, p3: String, p4: String, p5: String, p6: ByteArray, p7: Int, p8: String) {}
+
+    override fun onSendMessageSuccess(p0: Long, p1: Long, p2: String) {}
+
+    override fun onSendMessageFailure(p0: Long, p1: Long, p2: String, p3: Int, p4: String) {}
+
+    override fun onSendOutOfDialogMessageSuccess(p0: Long, p1: String, p2: String, p3: String, p4: String, p5: String) {}
+
+    override fun onSendOutOfDialogMessageFailure(p0: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: Int, p7: String) {}
+
+    override fun onSubscriptionFailure(p0: Long, p1: Int) {}
+
+    override fun onSubscriptionTerminated(p0: Long) {}
+
+    override fun onPlayFileFinished(p0: Long, p1: String) {}
+
+    override fun onStatistics(p0: Long, p1: String) {}
+
+    /**
+     * onAudioDeviceChanged
+     */
+    override fun onAudioDeviceChanged(p0: PortSipEnumDefine.AudioDevice, p1: MutableSet<PortSipEnumDefine.AudioDevice>) {
+        Log.d(tag, "onAudioDeviceChanged: $p0, $p1")
+        // ToDo
+    }
+
+    override fun onAudioFocusChange(p0: Int) {}
+
+    override fun onRTPPacketCallback(p0: Long, p1: Int, p2: Int, p3: ByteArray, p4: Int) {}
+
+    override fun onAudioRawCallback(p0: Long, p1: Int, p2: ByteArray, p3: Int, p4: Int) {}
+
+    override fun onVideoRawCallback(p0: Long, p1: Int, p2: Int, p3: Int, p4: ByteArray, p5: Int) {}
+
+    /**
+     * onNetworkChange
+     */
+    override fun onNetworkChange(netMobile: Int) {
+        // ToDo
+    }
+
+    /**
+     * register
+     */
     private fun register() {
         portSipSdk.setOnPortSIPEvent(this)
 
-        CallManager.getInstance().isOnline = true
+        SessionManager.getInstance().isOnline = true
 
         val externalFilesPath = getExternalFilesDir(null)!!.absolutePath
         val tlsCertificatesRootPath = "$externalFilesPath/certs"
@@ -128,13 +408,13 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         )
 
         if (result != PortSipErrorcode.ECoreErrorNone) {
-            CallManager.getInstance().resetAll()
+            SessionManager.getInstance().resetAll()
         } else {
             result = portSipSdk.setLicenseKey("HO1KH-5ZQ8W-BJSZC-NIDRI-TH5UD")
             if (result == PortSipErrorcode.ECoreWrongLicenseKey) {
-                log("The wrong license key was detected, please check with sales@portsip.com or support@portsip.com")
+                Log.d(tag, "The wrong license key was detected, please check with sales@portsip.com or support@portsip.com")
             } else if (result == PortSipErrorcode.ECoreTrialVersionLicenseKey) {
-                log("This Is Trial Version")
+                Log.d(tag, "This Is Trial Version")
             }
         }
 
@@ -167,8 +447,8 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         )
 
         if (result != PortSipErrorcode.ECoreErrorNone) {
-            log("setUser failure ErrorCode = $result")
-            CallManager.getInstance().resetAll()
+            Log.d(tag, "setUser failure ErrorCode = $result")
+            SessionManager.getInstance().resetAll()
             return
         }
 
@@ -190,254 +470,21 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
         result = portSipSdk.registerServer(90, 0)
         if (result != PortSipErrorcode.ECoreErrorNone) {
-            log("registerServer failure ErrorCode =$result")
+            Log.d(tag, "registerServer failure ErrorCode =$result")
             portSipSdk.unRegisterServer(100)
-            CallManager.getInstance().resetAll()
+            SessionManager.getInstance().resetAll()
         }
     }
 
+    /**
+     * unregister
+     */
     private fun unregister() {
         portSipSdk.unRegisterServer(100)
         portSipSdk.removeUser()
         portSipSdk.unInitialize()
-        CallManager.getInstance().isOnline = false
-        CallManager.getInstance().isRegistered = false
-    }
-
-    override fun onCreate() {
-        super.onCreate()
-    }
-
-    override fun onBind(p0: Intent): IBinder? {
-        log("onInviteIncoming: $p0")
-        return null
-    }
-
-    override fun onRegisterSuccess(p0: String, p1: Int, p2: String) {
-        log("onRegisterSuccess: $p0, $p1, $p2")
-        CallManager.getInstance().isRegistered = true
-        // ToDo
-    }
-
-    override fun onRegisterFailure(p0: String, p1: Int, p2: String) {
-        log("onRegisterFailure: $p0, $p1, $p2")
-        CallManager.getInstance().isRegistered = false
-        // ToDo
-    }
-
-    override fun onInviteIncoming(sessionId: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: String, p7: Boolean, p8: Boolean, p9: String) {
-        log("onInviteIncoming: $sessionId, $p1, $p2, $p3, $p4, $p5, $p6, $p7, $p8, $p9")
-        if (CallManager.getInstance().findIncomingCall() != null) {
-            portSipSdk.rejectCall(sessionId, 486)
-            return
-        }
-    }
-
-    override fun onInviteTrying(p0: Long) {
-        log("onInviteTrying: $p0")
-    }
-
-    override fun onInviteSessionProgress(p0: Long, p1: String, p2: String, p3: Boolean, p4: Boolean, p5: Boolean, p6: String) {
-        log("onInviteSessionProgress: $p0, $p1, $p2, $p3, $p4, $p5, $p6")
-    }
-
-    override fun onInviteRinging(p0: Long, p1: String, p2: Int, p3: String) {
-        log("onInviteRinging: $p0, $p1, $p2, $p3")
-    }
-
-    override fun onInviteAnswered(p0: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: String, p7: Boolean, p8: Boolean, p9: String) {
-        log("onInviteAnswered: $p0, $p1, $p2, $p3, $p4, $p5, $p6, $p7, $p8, $p9")
-        val intent = Intent(ACTION_INVITE_ANSWERED)
-        this.sendBroadcast(intent)
-    }
-
-    override fun onInviteFailure(sessionId: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: Int, p7: String) {
-        log("onInviteFailure: $sessionId, $p1, $p2, $p3, $p4, $p5, $p6, $p7")
-
-        Ring.getInstance(this).stopOutgoingTone()
-
-        val session: Session = CallManager.getInstance().findSessionBySessionId(sessionId) ?: return
-        session.state = CallStateFlag.FAILED
-        session.sessionId = sessionId
-
-        val intent = Intent("com.sozonext.PORTSIP_JS_CALL")
-        intent.putExtra("jsFunction", "onIncomingCall('1234')")
-        this.sendBroadcast(intent)
-
-    }
-
-    override fun onInviteUpdated(p0: Long, p1: String, p2: String, p3: String, p4: Boolean, p5: Boolean, p6: Boolean, p7: String) {
-        log("onInviteUpdated: $p0, $p1, $p2, $p3, $p4, $p5, $p6, $p7")
-    }
-
-    override fun onInviteConnected(p0: Long) {
-        log("onInviteConnected: $p0")
-
-        Ring.getInstance(this).stopOutgoingTone()
-        val intent = Intent(ACTION_INVITE_ANSWERED)
-        Log.d(tag, "onInviteConnected: Sending broadcast with action: ${intent.action}")
-        this.sendBroadcast(intent)
-    }
-
-    override fun onInviteBeginingForward(p0: String) {
-        log("onInviteBeginingForward: $p0")
-    }
-
-    override fun onInviteClosed(p0: Long, p1: String) {
-        log("onInviteClosed: $p0, $p1")
-    }
-
-    override fun onDialogStateUpdated(p0: String, p1: String, p2: String, p3: String) {
-        log("onDialogStateUpdated: $p0, $p1, $p2, $p3")
-    }
-
-    override fun onRemoteHold(p0: Long) {
-        log("onRemoteHold: $p0")
-    }
-
-    override fun onRemoteUnHold(p0: Long, p1: String, p2: String, p3: Boolean, p4: Boolean) {
-        log("onRemoteUnHold: $p0, $p1, $p2, $p3, $p4")
-    }
-
-    override fun onReceivedRefer(p0: Long, p1: Long, p2: String, p3: String, p4: String) {
-        log("onReceivedRefer: $p0, $p1, $p2, $p3, $p4")
-    }
-
-    override fun onReferAccepted(p0: Long) {
-        log("onReferAccepted: $p0")
-    }
-
-    override fun onReferRejected(p0: Long, p1: String, p2: Int) {
-        log("onReferRejected: $p0, $p1, $p2")
-    }
-
-    override fun onTransferTrying(p0: Long) {
-        log("onTransferTrying: $p0")
-    }
-
-    override fun onTransferRinging(p0: Long) {
-        log("onTransferRinging: $p0")
-    }
-
-    override fun onACTVTransferSuccess(p0: Long) {
-        log("onACTVTransferSuccess: $p0")
-    }
-
-    override fun onACTVTransferFailure(p0: Long, p1: String, p2: Int) {
-        log("onACTVTransferFailure: $p0, $p1, $p2")
-    }
-
-    override fun onReceivedSignaling(p0: Long, p1: String) {
-        log("onReceivedSignaling: $p0, $p1")
-    }
-
-    override fun onSendingSignaling(p0: Long, p1: String) {
-        log("onSendingSignaling: $p0, $p1")
-    }
-
-    override fun onWaitingVoiceMessage(p0: String, p1: Int, p2: Int, p3: Int, p4: Int) {
-        log("onWaitingVoiceMessage: $p0, $p1, $p2, $p3, $p4")
-    }
-
-    override fun onWaitingFaxMessage(p0: String, p1: Int, p2: Int, p3: Int, p4: Int) {
-        log("onWaitingFaxMessage: $p0, $p1, $p2, $p3, $p4")
-    }
-
-    override fun onRecvDtmfTone(p0: Long, p1: Int) {
-        log("onRecvDtmfTone: $p0, $p1")
-    }
-
-    override fun onRecvOptions(p0: String) {
-        log("onRecvOptions: $p0")
-    }
-
-    override fun onRecvInfo(p0: String) {
-        log("onRecvInfo: $p0")
-    }
-
-    override fun onRecvNotifyOfSubscription(p0: Long, p1: String, p2: ByteArray, p3: Int) {
-        log("onRecvNotifyOfSubscription: $p0, $p1, $p2, $p3")
-    }
-
-    override fun onPresenceRecvSubscribe(p0: Long, p1: String, p2: String, p3: String) {
-        log("onPresenceRecvSubscribe: $p0, $p1, $p2, $p3")
-    }
-
-    override fun onPresenceOnline(p0: String, p1: String, p2: String) {
-        log("onPresenceOnline: $p0, $p1, $p2")
-    }
-
-    override fun onPresenceOffline(p0: String, p1: String) {
-        log("onPresenceOffline: $p0, $p1")
-    }
-
-    override fun onRecvMessage(p0: Long, p1: String, p2: String, p3: ByteArray, p4: Int) {
-        log("onRecvMessage: $p0, $p1, $p2, $p3, $p4")
-    }
-
-    override fun onRecvOutOfDialogMessage(p0: String, p1: String, p2: String, p3: String, p4: String, p5: String, p6: ByteArray, p7: Int, p8: String) {
-        log("onRecvOutOfDialogMessage: $p0, $p1, $p2, $p3, $p4, $p5, $p6, $p7, $p8")
-    }
-
-    override fun onSendMessageSuccess(p0: Long, p1: Long, p2: String) {
-        log("onSendMessageSuccess: $p0, $p1, $p2")
-    }
-
-    override fun onSendMessageFailure(p0: Long, p1: Long, p2: String, p3: Int, p4: String) {
-        log("onSendMessageFailure: $p0, $p1, $p2, $p3, $p4")
-    }
-
-    override fun onSendOutOfDialogMessageSuccess(p0: Long, p1: String, p2: String, p3: String, p4: String, p5: String) {
-        log("onSendOutOfDialogMessageSuccess: $p0, $p1, $p2, $p3, $p4, $p5")
-    }
-
-    override fun onSendOutOfDialogMessageFailure(p0: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: Int, p7: String) {
-        log("onSendOutOfDialogMessageFailure: $p0, $p1, $p2, $p3, $p4, $p5, $p6, $p7")
-    }
-
-    override fun onSubscriptionFailure(p0: Long, p1: Int) {
-        log("onSubscriptionFailure: $p0, $p1")
-    }
-
-    override fun onSubscriptionTerminated(p0: Long) {
-        log("onSubscriptionTerminated: $p0")
-    }
-
-    override fun onPlayFileFinished(p0: Long, p1: String) {
-        log("onPlayFileFinished: $p0, $p1")
-    }
-
-    override fun onStatistics(p0: Long, p1: String) {
-        log("onStatistics: $p0, $p1")
-    }
-
-    override fun onAudioDeviceChanged(p0: PortSipEnumDefine.AudioDevice, p1: MutableSet<PortSipEnumDefine.AudioDevice>) {
-        log("onAudioDeviceChanged: $p0, $p1")
-    }
-
-    override fun onAudioFocusChange(p0: Int) {
-        log("onAudioFocusChange: $p0")
-    }
-
-    override fun onRTPPacketCallback(p0: Long, p1: Int, p2: Int, p3: ByteArray, p4: Int) {
-        log("onRTPPacketCallback: $p0, $p1, $p2, $p3, $p4")
-    }
-
-    override fun onAudioRawCallback(p0: Long, p1: Int, p2: ByteArray, p3: Int, p4: Int) {
-        log("onAudioRawCallback: $p0, $p1, $p2, $p3, $p4")
-    }
-
-    override fun onVideoRawCallback(p0: Long, p1: Int, p2: Int, p3: Int, p4: ByteArray, p5: Int) {
-        log("onVideoRawCallback: $p0, $p1, $p2, $p3, $p4, $p5")
-    }
-
-    override fun onNetworkChange(netMobile: Int) {
-        log("onNetworkChange: $netMobile")
-    }
-
-    private fun log(message: String) {
-        Log.d(tag, message)
-        // Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        SessionManager.getInstance().isOnline = false
+        SessionManager.getInstance().isRegistered = false
     }
 
 }
