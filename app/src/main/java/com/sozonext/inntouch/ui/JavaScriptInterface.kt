@@ -15,7 +15,7 @@ import android.widget.Toast
 import com.portsip.PortSipEnumDefine
 import com.sozonext.inntouch.application.MyApplication
 import com.sozonext.inntouch.service.PortSipService
-import com.sozonext.inntouch.utils.DataStoreUtils
+import com.sozonext.inntouch.utils.DataStoreUtil
 import com.sozonext.inntouch.utils.Ring
 import com.sozonext.inntouch.utils.Session
 import com.sozonext.inntouch.utils.SessionManager
@@ -35,10 +35,10 @@ class JavaScriptInterface(private val context: Context) {
         Log.d(tag, "register($sipServer, $sipDomain, $extensionNumber, $extensionPassword)")
 
         runBlocking {
-            DataStoreUtils(context).setDataStoreValue(DataStoreUtils.SIP_SERVER, sipServer)
-            DataStoreUtils(context).setDataStoreValue(DataStoreUtils.SIP_DOMAIN, sipDomain)
-            DataStoreUtils(context).setDataStoreValue(DataStoreUtils.EXTENSION_NUMBER, extensionNumber)
-            DataStoreUtils(context).setDataStoreValue(DataStoreUtils.EXTENSION_PASSWORD, extensionPassword)
+            DataStoreUtil(context).setDataStoreValue(DataStoreUtil.SIP_SERVER, sipServer)
+            DataStoreUtil(context).setDataStoreValue(DataStoreUtil.SIP_DOMAIN, sipDomain)
+            DataStoreUtil(context).setDataStoreValue(DataStoreUtil.EXTENSION_NUMBER, extensionNumber)
+            DataStoreUtil(context).setDataStoreValue(DataStoreUtil.EXTENSION_PASSWORD, extensionPassword)
         }
 
         val intent = Intent(context, PortSipService::class.java).apply {

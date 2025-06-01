@@ -9,7 +9,7 @@ import android.view.ViewGroup
 import android.widget.ListView
 import android.widget.SimpleAdapter
 import androidx.fragment.app.Fragment
-import com.sozonext.inntouch.utils.KioskUtils
+import com.sozonext.inntouch.utils.KioskUtil
 
 class GeneralSettingsFragment : Fragment() {
 
@@ -41,7 +41,7 @@ class GeneralSettingsFragment : Fragment() {
                 // 客室の設定をする
                 0 -> navigateConfigUrl()
                 // アプリの固定を解除する
-                1 -> KioskUtils(context).stop(requireActivity())
+                1 -> stopKioskMode()
                 // キャッシュを削除する
                 2 -> clearCache()
             }
@@ -54,6 +54,10 @@ class GeneralSettingsFragment : Fragment() {
         intent.putExtra("event", "navigateConfigUrl")
         requireActivity().setResult(Activity.RESULT_OK, intent)
         requireActivity().finish()
+    }
+
+    private fun stopKioskMode() {
+        KioskUtil(requireContext()).stop(requireActivity())
     }
 
     private fun clearCache() {

@@ -15,9 +15,10 @@ import com.portsip.OnPortSIPEvent
 import com.portsip.PortSipEnumDefine
 import com.portsip.PortSipEnumDefine.ENUM_TRANSPORT_UDP
 import com.portsip.PortSipErrorcode
+import com.sozonext.inntouch.R
 import com.sozonext.inntouch.application.MyApplication
 import com.sozonext.inntouch.receiver.NetWorkReceiver
-import com.sozonext.inntouch.utils.DataStoreUtils
+import com.sozonext.inntouch.utils.DataStoreUtil
 import com.sozonext.inntouch.utils.Ring
 import com.sozonext.inntouch.utils.Session
 import com.sozonext.inntouch.utils.SessionManager
@@ -78,17 +79,17 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val result = super.onStartCommand(intent, flags, startId)
 
-        val channel = NotificationChannel(
-            "com.sozonext.inntouch.service",
-            "PortSip Service Channel",
-            NotificationManager.IMPORTANCE_LOW
-        )
+        val channelId = getString(R.string.channel_id)
+        val channelName = getString(R.string.channel_name)
+
+        val channel = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_LOW)
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(channel)
 
-        val notification = NotificationCompat.Builder(this, "com.sozonext.inntouch.service")
-            .setContentTitle("PortSip Service")
-            .setContentText("PortSip service is running")
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setContentTitle(channelName)
+            .setContentText("$channelName is Running")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .build()
 
         startForeground(1, notification)
@@ -419,16 +420,16 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         }
 
         val sipServer: String = runBlocking {
-            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.SIP_SERVER).first().toString()
+            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.SIP_SERVER).first().toString()
         }
         val sipDomain: String = runBlocking {
-            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.SIP_DOMAIN).first().toString()
+            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.SIP_DOMAIN).first().toString()
         }
         val exceptionNumber: String = runBlocking {
-            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.EXTENSION_NUMBER).first().toString()
+            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.EXTENSION_NUMBER).first().toString()
         }
         val exceptionPassword: String = runBlocking {
-            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.EXTENSION_PASSWORD).first().toString()
+            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.EXTENSION_PASSWORD).first().toString()
         }
 
         portSipSdk.removeUser()

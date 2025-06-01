@@ -20,7 +20,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import com.sozonext.inntouch.R
-import com.sozonext.inntouch.utils.DataStoreUtils
+import com.sozonext.inntouch.utils.DataStoreUtil
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 
@@ -81,14 +81,14 @@ class QRCodeScannerActivity : AppCompatActivity() {
                         if (!rawValue.isNullOrEmpty()) {
                             val json = JSONObject(barcode.rawValue.toString())
                             runBlocking {
-                                DataStoreUtils(applicationContext).setDataStoreValue(
-                                    DataStoreUtils.PASSWORD, json.getString("password")
+                                DataStoreUtil(applicationContext).setDataStoreValue(
+                                    DataStoreUtil.PASSWORD, json.getString("password")
                                 )
-                                DataStoreUtils(applicationContext).setDataStoreValue(
-                                    DataStoreUtils.START_URL, json.getString("start_url")
+                                DataStoreUtil(applicationContext).setDataStoreValue(
+                                    DataStoreUtil.START_URL, json.getString("start_url")
                                 )
-                                DataStoreUtils(applicationContext).setDataStoreValue(
-                                    DataStoreUtils.CONFIG_URL, json.getString("config_url")
+                                DataStoreUtil(applicationContext).setDataStoreValue(
+                                    DataStoreUtil.CONFIG_URL, json.getString("config_url")
                                 )
                             }
                             val intent = Intent()

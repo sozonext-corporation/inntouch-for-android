@@ -101,10 +101,4 @@ class Ring(private val context: Context) {
         outgoingToneMediaPlayer = null
     }
 
-    fun stopAllTone(): Boolean {
-        stopIncomingTone()
-        stopOutgoingTone()
-        return true
-    }
-
 }

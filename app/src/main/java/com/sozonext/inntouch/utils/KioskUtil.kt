@@ -8,7 +8,7 @@ import android.content.Context
 import android.widget.Toast
 import com.sozonext.inntouch.MyDeviceAdminReceiver
 
-class KioskUtils(private val context: Context) {
+class KioskUtil(private val context: Context) {
 
     private val dar = ComponentName(context, MyDeviceAdminReceiver::class.java)
     private val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager

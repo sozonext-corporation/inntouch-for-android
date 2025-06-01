@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 
-class DataStoreUtils(private val context: Context) {
+class DataStoreUtil(private val context: Context) {
 
     private val tag: String = context.packageName
 

@@ -10,7 +10,7 @@ import android.widget.ListView
 import android.widget.SimpleAdapter
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
-import com.sozonext.inntouch.utils.DataStoreUtils
+import com.sozonext.inntouch.utils.DataStoreUtil
 import kotlinx.coroutines.runBlocking
 
 
@@ -37,8 +37,10 @@ class SystemSettingsFragment : Fragment() {
         }
         listView.setOnItemClickListener { _, _, position, _ ->
             when (position) {
+                // ソフトウェアアップデート (今すぐ)"
+                0 -> update()
                 // アプリの設定を初期化する
-                0 -> factoryReset()
+                1 -> factoryReset()
             }
         }
         return listView
@@ -50,7 +52,24 @@ class SystemSettingsFragment : Fragment() {
             .setMessage("アプリの設定を初期化しようとしてます。\r\n再設定を行うには管理画面からQRコードを読み取る必要があります。\r\n本当によろしいでしょうか？")
             .setPositiveButton("OK") { _, _ ->
                 runBlocking {
-                    DataStoreUtils(context).resetDataStore()
+                    DataStoreUtil(context).resetDataStore()
+                }
+                val intent = Intent()
+                intent.putExtra("event", "launchQRCodeActivity")
+                requireActivity().setResult(Activity.RESULT_OK, intent)
+                requireActivity().finish()
+            }
+            .setNegativeButton("No") { _, _ -> }
+            .show()
+    }
+
+    private fun update() {
+        val context = requireContext()
+        AlertDialog.Builder(context).setTitle("警告")
+            .setMessage("アプリの設定を初期化しようとしてます。\r\n再設定を行うには管理画面からQRコードを読み取る必要があります。\r\n本当によろしいでしょうか？")
+            .setPositiveButton("OK") { _, _ ->
+                runBlocking {
+                    DataStoreUtil(context).resetDataStore()
                 }
                 val intent = Intent()
                 intent.putExtra("event", "launchQRCodeActivity")

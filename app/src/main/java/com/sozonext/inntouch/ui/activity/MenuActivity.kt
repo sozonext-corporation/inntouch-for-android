@@ -5,7 +5,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.tabs.TabLayout
 import com.sozonext.inntouch.R
-import com.sozonext.inntouch.ui.fragment.AppInfoFragment
+import com.sozonext.inntouch.ui.fragment.ApplicationUpdateFragment
+import com.sozonext.inntouch.ui.fragment.SystemInformationFragment
 import com.sozonext.inntouch.ui.fragment.GeneralSettingsFragment
 import com.sozonext.inntouch.ui.fragment.SystemSettingsFragment
 
@@ -17,9 +18,10 @@ class MenuActivity : AppCompatActivity() {
         setContentView(R.layout.activity_menu)
 
         val tabLayout: TabLayout = findViewById(R.id.tabLayout)
-        tabLayout.addTab(tabLayout.newTab().setText("基本"))
-        tabLayout.addTab(tabLayout.newTab().setText("アプリ"))
-        tabLayout.addTab(tabLayout.newTab().setText("システム"))
+        tabLayout.addTab(tabLayout.newTab().setText("基本設定"))
+        tabLayout.addTab(tabLayout.newTab().setText("アップデート"))
+        tabLayout.addTab(tabLayout.newTab().setText("システム情報"))
+        tabLayout.addTab(tabLayout.newTab().setText("システム設定"))
 
         supportFragmentManager.beginTransaction()
             .replace(R.id.frameLayout, GeneralSettingsFragment())
@@ -32,12 +34,16 @@ class MenuActivity : AppCompatActivity() {
                     0 -> supportFragmentManager.beginTransaction()
                         .replace(R.id.frameLayout, GeneralSettingsFragment())
                         .commit()
-                    // アプリ情報
+                    // アップデート
                     1 -> supportFragmentManager.beginTransaction()
-                        .replace(R.id.frameLayout, AppInfoFragment())
+                        .replace(R.id.frameLayout, ApplicationUpdateFragment())
+                        .commit()
+                    // システム情報
+                    2 -> supportFragmentManager.beginTransaction()
+                        .replace(R.id.frameLayout, SystemInformationFragment())
                         .commit()
                     // システム設定
-                    2 -> supportFragmentManager.beginTransaction()
+                    3 -> supportFragmentManager.beginTransaction()
                         .replace(R.id.frameLayout, SystemSettingsFragment())
                         .commit()
                 }
