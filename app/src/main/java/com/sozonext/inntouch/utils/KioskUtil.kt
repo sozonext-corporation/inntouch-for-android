@@ -6,6 +6,7 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.widget.Toast
+import androidx.fragment.app.FragmentActivity
 import com.sozonext.inntouch.MyDeviceAdminReceiver
 
 class KioskUtil(private val context: Context) {
@@ -25,7 +26,7 @@ class KioskUtil(private val context: Context) {
         }
     }
 
-    fun stop(activity: Activity) {
+    fun stop(activity: FragmentActivity) {
         if (hasDeviceOwnerPermission()) {
             activity.stopLockTask()
             Toast.makeText(context, "アプリの固定を解除しました", Toast.LENGTH_SHORT).show()

@@ -11,7 +11,7 @@ android {
         minSdk = 30 // Android 12
         targetSdk = 35
         versionCode = 1
-        versionName = "v1.0.0"
+        versionName = "v1.0.0-debug"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {

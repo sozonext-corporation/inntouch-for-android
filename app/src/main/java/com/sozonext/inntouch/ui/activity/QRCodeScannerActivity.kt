@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
@@ -79,22 +80,26 @@ class QRCodeScannerActivity : AppCompatActivity() {
                     for (barcode in barcodes) {
                         val rawValue = barcode.rawValue
                         if (!rawValue.isNullOrEmpty()) {
-                            val json = JSONObject(barcode.rawValue.toString())
-                            runBlocking {
-                                DataStoreUtil(applicationContext).setDataStoreValue(
-                                    DataStoreUtil.PASSWORD, json.getString("password")
-                                )
-                                DataStoreUtil(applicationContext).setDataStoreValue(
-                                    DataStoreUtil.START_URL, json.getString("start_url")
-                                )
-                                DataStoreUtil(applicationContext).setDataStoreValue(
-                                    DataStoreUtil.CONFIG_URL, json.getString("config_url")
-                                )
+                            try {
+                                val json = JSONObject(barcode.rawValue.toString())
+                                runBlocking {
+                                    DataStoreUtil(applicationContext).setDataStoreValue(
+                                        DataStoreUtil.PASSWORD, json.getString("password")
+                                    )
+                                    DataStoreUtil(applicationContext).setDataStoreValue(
+                                        DataStoreUtil.START_URL, json.getString("start_url")
+                                    )
+                                    DataStoreUtil(applicationContext).setDataStoreValue(
+                                        DataStoreUtil.CONFIG_URL, json.getString("config_url")
+                                    )
+                                }
+                                val intent = Intent()
+                                intent.putExtra("event", "navigateStartUrl")
+                                setResult(RESULT_OK, intent)
+                                finish()
+                            } catch (e: Exception) {
+                                Toast.makeText(applicationContext, "インストールQRコードの読み取りに失敗しました。", Toast.LENGTH_SHORT).show()
                             }
-                            val intent = Intent()
-                            intent.putExtra("event", "navigateStartUrl")
-                            setResult(RESULT_OK, intent)
-                            finish()
                         }
                     }
                 }

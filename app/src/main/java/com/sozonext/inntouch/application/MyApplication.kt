@@ -5,9 +5,6 @@ import com.portsip.PortSipSdk
 
 class MyApplication : Application() {
 
-    var isConference: Boolean = false
-    var isUseFrontCamera: Boolean = false
-
     companion object {
         lateinit var portSipSdk: PortSipSdk
             private set

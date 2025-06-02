@@ -1,16 +1,21 @@
 package com.sozonext.inntouch.service
 
 import android.annotation.SuppressLint
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.text.TextUtils
 import android.util.Log
-import androidx.core.app.NotificationCompat
+import com.google.firebase.messaging.FirebaseMessaging
 import com.portsip.OnPortSIPEvent
 import com.portsip.PortSipEnumDefine
 import com.portsip.PortSipEnumDefine.ENUM_TRANSPORT_UDP
@@ -18,6 +23,7 @@ import com.portsip.PortSipErrorcode
 import com.sozonext.inntouch.R
 import com.sozonext.inntouch.application.MyApplication
 import com.sozonext.inntouch.receiver.NetWorkReceiver
+import com.sozonext.inntouch.ui.activity.MainActivity
 import com.sozonext.inntouch.utils.DataStoreUtil
 import com.sozonext.inntouch.utils.Ring
 import com.sozonext.inntouch.utils.Session
@@ -36,7 +42,8 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
     companion object {
 
-        private const val APP_ID = "com.sozonext.inntouch";
+        private const val SERVICE_NOTIFICATION = 31414
+        private const val APP_ID = "com.sozonext.inntouch"
 
         const val ACTION_SIP_REGISTER: String = "com.sozonext.inntouch.action.SIP_REGISTER"
         const val ACTION_SIP_UNREGISTER: String = "com.sozonext.inntouch.action.SIP_UNREGISTER"
@@ -68,6 +75,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
         const val EXTRA_PUSH_TOKEN: String = "com.sozonext.inntouch.action.EXTRA_PUSH_TOKEN"
         const val EXTRA_TARGET_EXTENSION_DISPLAY_NAME: String = "com.sozonext.inntouch.action.EXTRA_TARGET_EXTENSION_DISPLAY_NAME"
+        const val EXTRA_REGISTER_STATE: String = "com.sozonext.inntouch.action.EXTRA_REGISTER_STATE"
 
         fun startServiceCompatibility(context: Context, intent: Intent) {
             context.startForegroundService(intent)
@@ -75,24 +83,110 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
     }
 
+    private lateinit var mNotificationManager: NotificationManager
+    private lateinit var mNetWorkReceiver: NetWorkReceiver
+
+    override fun onCreate() {
+        super.onCreate()
+
+        val channelId = getString(R.string.channel_id)
+        val highChannelId = "$channelId.HIGH"
+
+        mNotificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val channel = NotificationChannel(channelId, getString(R.string.app_name), NotificationManager.IMPORTANCE_DEFAULT)
+        val callChannel = NotificationChannel(highChannelId, getString(R.string.app_name), NotificationManager.IMPORTANCE_HIGH)
+        channel.enableLights(true)
+        mNotificationManager.createNotificationChannel(channel)
+        mNotificationManager.createNotificationChannel(callChannel)
+
+        //
+        val intent = Intent(this, MainActivity::class.java)
+        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+        val contentIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+        val builder = Notification.Builder(this, channelId)
+
+        builder.setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText("Service Running")
+            .setContentIntent(contentIntent)
+            .build()
+        startForeground(
+            SERVICE_NOTIFICATION, builder.build(), (ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                    or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                    or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        )
+
+        //
+        val filter = IntentFilter()
+        filter.addAction("android.net.conn.CONNECTIVITY_CHANGE")
+        mNetWorkReceiver = NetWorkReceiver()
+        mNetWorkReceiver.setListener(this)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(mNetWorkReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(mNetWorkReceiver, filter)
+        }
+
+        try {
+            FirebaseMessaging.getInstance().token
+                .addOnCompleteListener { task ->
+                    if (!task.isSuccessful) {
+                        Log.w("FCM", "FCM token fetch failed", task.exception)
+                        return@addOnCompleteListener
+                    }
+                    pushToken = task.result
+                    if (!TextUtils.isEmpty(pushToken) && SessionManager.getInstance().isRegistered) {
+                        val pushMessage = "device-os=android;device-uid=$pushToken;allow-call-push=true;allow-message-push=true;app-id=${APP_ID}"
+                        portSipSdk.addSipMessageHeader(-1, "REGISTER", 1, "portsip-push", pushMessage)
+                        portSipSdk.addSipMessageHeader(-1, "REGISTER", 1, "x-p-push", pushMessage)
+                        portSipSdk.refreshRegistration(0)
+                    }
+                }
+        } catch (e: IllegalStateException) {
+            Log.d("FCM", "Token fetch failed with exception: ${e.message}")
+        }
+    }
+
+    /**
+     *
+     */
+    override fun onDestroy() {
+        super.onDestroy()
+        portSipSdk.destroyConference()
+
+        if (mNetWorkReceiver != null) {
+            unregisterReceiver(mNetWorkReceiver)
+        }
+//        if (mCpuLock != null) {
+//            mCpuLock.release()
+//        }
+        val channelId = getString(R.string.channel_id)
+        mNotificationManager.cancelAll()
+        mNotificationManager.deleteNotificationChannel(channelId)
+        mNotificationManager.deleteNotificationChannel("$channelId.HIGH")
+        portSipSdk.removeUser()
+    }
+
+
     @SuppressLint("ForegroundServiceType")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val result = super.onStartCommand(intent, flags, startId)
 
-        val channelId = getString(R.string.channel_id)
-        val channelName = getString(R.string.channel_name)
-
-        val channel = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_LOW)
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(channel)
-
-        val notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle(channelName)
-            .setContentText("$channelName is Running")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .build()
-
-        startForeground(1, notification)
+//        val channelId = getString(R.string.channel_id)
+//        val channelName = getString(R.string.channel_name)
+//
+//        val channel = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_LOW)
+//        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+//        manager.createNotificationChannel(channel)
+//
+//        val notification = NotificationCompat.Builder(this, channelId)
+//            .setContentTitle(channelName)
+//            .setContentText("$channelName is Running")
+//            .setSmallIcon(R.drawable.ic_launcher_foreground)
+//            .build()
+//
+//        startForeground(1, notification)
 
         if (intent != null) {
             when (intent.action) {
@@ -123,19 +217,22 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
     /**
      * onRegisterSuccess
      */
-    override fun onRegisterSuccess(p0: String, p1: Int, p2: String) {
-        Log.d(tag, "onRegisterSuccess: $p0, $p1, $p2")
+    override fun onRegisterSuccess(state: String, p1: Int, p2: String) {
+        Log.d(tag, "onRegisterSuccess: $state, $p1, $p2")
         SessionManager.getInstance().isRegistered = true
-        // ToDo
+        val broadIntent = Intent(REGISTER_CHANGE_ACTION)
+        broadIntent.putExtra(EXTRA_REGISTER_STATE, state)
     }
 
     /**
      * onRegisterFailure
      */
-    override fun onRegisterFailure(p0: String, p1: Int, p2: String) {
-        Log.d(tag, "onRegisterFailure: $p0, $p1, $p2")
+    override fun onRegisterFailure(state: String, p1: Int, p2: String) {
+        Log.d(tag, "onRegisterFailure: $state, $p1, $p2")
         SessionManager.getInstance().isRegistered = false
-        // ToDo
+        SessionManager.getInstance().resetAll()
+        val broadIntent = Intent(REGISTER_CHANGE_ACTION)
+        broadIntent.putExtra(EXTRA_REGISTER_STATE, state)
     }
 
     /**
@@ -157,7 +254,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         session.targetExtensionNumber = caller
         session.targetExtensionDisplayName = callerDisplayName
 
-        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val powerManager = getSystemService(POWER_SERVICE) as PowerManager
         val wakeLock = powerManager.newWakeLock(
             PowerManager.FULL_WAKE_LOCK or
                     PowerManager.ACQUIRE_CAUSES_WAKEUP or

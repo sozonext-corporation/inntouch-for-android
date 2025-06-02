@@ -83,8 +83,10 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         webView.addJavascriptInterface(JavaScriptInterface(this), "Android")
 
         // Debug Mode
-        webView.settings.allowContentAccess = true
-        webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        if (BuildConfig.DEBUG) {
+            webView.settings.allowContentAccess = true
+            webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        }
 
         webView.webViewClient = object : WebViewClient() {
             @SuppressLint("WebViewClientOnReceivedSslError")
@@ -125,16 +127,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                 request.grant(request.resources)
             }
 
-        }
-    }
-
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            Toast.makeText(this, "通知が許可されました", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "通知は許可されていません", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -187,21 +179,21 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         }
 
         // Notification
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                Snackbar.make(
-                    findViewById(android.R.id.content),
-                    "通知の権限が必要です。設定から許可してください。",
-                    Snackbar.LENGTH_INDEFINITE
-                )
-                    .setAction("設定を開く") {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", packageName, null)
-                        }
-                        startActivity(intent)
-                    }.show()
-            }
-        }
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+//            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+//                Snackbar.make(
+//                    findViewById(android.R.id.content),
+//                    "通知の権限が必要です。設定から許可してください。",
+//                    Snackbar.LENGTH_INDEFINITE
+//                )
+//                    .setAction("設定を開く") {
+//                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+//                            data = Uri.fromParts("package", packageName, null)
+//                        }
+//                        startActivity(intent)
+//                    }.show()
+//            }
+//        }
 
         // Backend Service (ToDo)
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
