@@ -110,11 +110,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
             .setContentText("Service Running")
             .setContentIntent(contentIntent)
             .build()
-        startForeground(
-            SERVICE_NOTIFICATION, builder.build(), (ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                    or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-                    or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        )
+        startForeground(SERVICE_NOTIFICATION, builder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
 
         //
         val filter = IntentFilter()
