@@ -21,9 +21,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- OTHER -->
-    <uses-permission android:name="android.permission.BIND_DEVICE_ADMIN"
-        tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.MANAGE_DEVICE_ADMINS"
+    <uses-permission
+        android:name="android.permission.BIND_DEVICE_ADMIN"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -41,28 +40,29 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.InnTouchApp"
-        tools:ignore="ForegroundServicePermission"
-        tools:targetApi="31">
+        android:theme="@style/Theme.InnTouchApp">
+        <!-- MainActivity -->
         <activity
             android:name=".ui.activity.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
+        <!-- MenuActivity -->
         <activity
             android:name=".ui.activity.MenuActivity"
-            android:exported="false" />
+            android:exported="true" />
+        <!-- QRCodeScannerActivity -->
         <activity
             android:name=".ui.activity.QRCodeScannerActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.activity.WebRtcActivity"
-            android:exported="false" />
-
+            android:exported="true" />
+        <!-- PortSipService -->
         <service
             android:name=".service.PortSipService"
             android:exported="false"
@@ -72,11 +72,6 @@
                 <action android:name="com.sozonext.inntouch.action.SIP_REGISTER" />
             </intent-filter>
         </service>
-        <service
-            android:name=".service.DownloadService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -86,7 +81,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-
         <!-- MyDeviceAdminReceiver -->
         <receiver
             android:name=".MyDeviceAdminReceiver"
@@ -100,15 +94,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- MyBroadcastReceiver -->
-        <receiver
-            android:name=".receiver.MyBroadcastReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
     </application>
 
 </manifest>

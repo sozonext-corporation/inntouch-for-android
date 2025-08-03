@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.hardware.usb.UsbManager
-import android.net.Uri
 import android.net.http.SslError
 import android.os.BatteryManager
 import android.os.Build
@@ -35,7 +34,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.net.toUri
-import com.google.android.material.snackbar.Snackbar
 import com.sozonext.inntouch.BuildConfig
 import com.sozonext.inntouch.R
 import com.sozonext.inntouch.service.PortSipService
@@ -60,14 +58,14 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         private const val REQUEST_CODE_CAMERA_AND_AUDIO = 2
     }
 
-    @SuppressLint("SetJavaScriptEnabled", "UnspecifiedRegisterReceiverFlag")
+    @SuppressLint("SetJavaScriptEnabled", "UnspecifiedRegisterReceiverFlag", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
         // On Click Listener
-        this.findViewById<Button>(R.id.button).setOnClickListener(this)
+        this.findViewById<Button>(R.id.hiddenButton).setOnClickListener(this)
 
         // Permissions
         requestPermissions()
@@ -92,9 +90,11 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             @SuppressLint("WebViewClientOnReceivedSslError")
             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
                 if (!BuildConfig.DEBUG) {
-                    super.onReceivedSslError(view, handler, error) // Release
+                    // Release Build
+                    super.onReceivedSslError(view, handler, error)
                 } else {
-                    handler?.proceed() // Debug
+                    // Debug Build
+                    handler?.proceed()
                 }
             }
 //            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
@@ -169,6 +169,16 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
     @SuppressLint("BatteryLife")
     private fun requestPermissions() {
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val canRequestPackageInstalls = packageManager.canRequestPackageInstalls()
+            if (!canRequestPackageInstalls) {
+                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = ("package:$packageName").toUri()
+                }
+                startActivity(intent)
+            }
+        }
+
         // Camera & Audio
         if (PackageManager.PERMISSION_GRANTED != ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ||
             PackageManager.PERMISSION_GRANTED != ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
@@ -177,23 +187,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                 this, arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO), REQUEST_CODE_CAMERA_AND_AUDIO
             )
         }
-
-        // Notification
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-//            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-//                Snackbar.make(
-//                    findViewById(android.R.id.content),
-//                    "通知の権限が必要です。設定から許可してください。",
-//                    Snackbar.LENGTH_INDEFINITE
-//                )
-//                    .setAction("設定を開く") {
-//                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-//                            data = Uri.fromParts("package", packageName, null)
-//                        }
-//                        startActivity(intent)
-//                    }.show()
-//            }
-//        }
 
         // Backend Service (ToDo)
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager

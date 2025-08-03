@@ -23,7 +23,7 @@
         </WebView>
 
         <Button
-            android:id="@+id/button"
+            android:id="@+id/hiddenButton"
             android:layout_width="80dp"
             android:layout_height="80dp"
             android:layout_gravity="center|end"

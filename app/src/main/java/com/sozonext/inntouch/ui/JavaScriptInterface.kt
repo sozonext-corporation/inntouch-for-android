@@ -15,6 +15,7 @@ import android.widget.Toast
 import com.portsip.PortSipEnumDefine
 import com.sozonext.inntouch.application.MyApplication
 import com.sozonext.inntouch.service.PortSipService
+import com.sozonext.inntouch.ui.activity.VideoCallActivity
 import com.sozonext.inntouch.utils.DataStoreUtil
 import com.sozonext.inntouch.utils.Ring
 import com.sozonext.inntouch.utils.Session
@@ -51,7 +52,6 @@ class JavaScriptInterface(private val context: Context) {
 
     @JavascriptInterface
     fun call(extensionNumber: String): Boolean {
-
         Log.d(tag, "call($extensionNumber)")
 
         // Start Tone
@@ -78,6 +78,50 @@ class JavaScriptInterface(private val context: Context) {
         session.sessionId = sessionId
         session.targetExtensionNumber = extensionNumber
         session.targetExtensionDisplayName = extensionDisplayName
+        return true
+    }
+
+    @JavascriptInterface
+    fun videoCall(extensionNumber: String): Boolean {
+        Log.d(tag, "videoCall($extensionNumber)")
+
+        // Start Tone
+        Ring.getInstance(context).startOutgoingTone()
+
+        // TODO
+        portSipSdk.clearAudioCodec()
+        portSipSdk.addAudioCodec(PortSipEnumDefine.ENUM_AUDIOCODEC_PCMA);
+        portSipSdk.addAudioCodec(PortSipEnumDefine.ENUM_AUDIOCODEC_PCMU)
+        portSipSdk.addAudioCodec(PortSipEnumDefine.ENUM_AUDIOCODEC_G729)
+
+        portSipSdk.clearVideoCodec()
+        portSipSdk.addVideoCodec(PortSipEnumDefine.ENUM_VIDEOCODEC_H264)
+        portSipSdk.addVideoCodec(PortSipEnumDefine.ENUM_VIDEOCODEC_VP8)
+        portSipSdk.addVideoCodec(PortSipEnumDefine.ENUM_VIDEOCODEC_VP9)
+        portSipSdk.setVideoResolution(1920, 1200)
+
+        val sessionId = portSipSdk.call(extensionNumber, true, true)
+        if (sessionId <= 0) {
+            Toast.makeText(context, "Call failure: $sessionId", Toast.LENGTH_SHORT).show()
+            return false
+        }
+        portSipSdk.sendVideo(sessionId, true)
+        portSipSdk.setVideoDeviceId(1)
+
+        val session: Session = SessionManager.getInstance().getCurrentSession() ?: return false
+
+        val extensionDisplayName = ""
+
+        session.sessionStatus = TRYING
+        session.sessionId = sessionId
+        session.targetExtensionNumber = extensionNumber
+        session.targetExtensionDisplayName = extensionDisplayName
+
+        val intent = Intent(context, VideoCallActivity::class.java).apply {
+            putExtra("extensionNumber", extensionNumber)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
         return true
     }
 
@@ -130,6 +174,7 @@ class JavaScriptInterface(private val context: Context) {
     @JavascriptInterface
     fun mute(enable: Boolean): Boolean {
         Log.d(tag, "mute($enable)")
+
         val currentSession = SessionManager.getInstance().getCurrentSession() ?: return false
         currentSession.let { session ->
             if (session.sessionStatus == CONNECTED) {
@@ -151,6 +196,7 @@ class JavaScriptInterface(private val context: Context) {
     @JavascriptInterface
     fun hold(enable: Boolean): Boolean {
         Log.d(tag, "hold($enable)")
+
         val currentSession = SessionManager.getInstance().getCurrentSession() ?: return false
         currentSession.let { session ->
             if (session.sessionStatus == CONNECTED) {
@@ -168,6 +214,7 @@ class JavaScriptInterface(private val context: Context) {
     @JavascriptInterface
     fun getCurrentSession(): String {
         Log.d(tag, "getCurrentSession()")
+
         val currentSession = SessionManager.getInstance().getCurrentSession()
         val json = if (currentSession != null) {
             JSONObject().apply {

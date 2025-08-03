@@ -15,6 +15,7 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.text.TextUtils
 import android.util.Log
+import androidx.annotation.RequiresApi
 import com.google.firebase.messaging.FirebaseMessaging
 import com.portsip.OnPortSIPEvent
 import com.portsip.PortSipEnumDefine
@@ -77,6 +78,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         const val EXTRA_TARGET_EXTENSION_DISPLAY_NAME: String = "com.sozonext.inntouch.action.EXTRA_TARGET_EXTENSION_DISPLAY_NAME"
         const val EXTRA_REGISTER_STATE: String = "com.sozonext.inntouch.action.EXTRA_REGISTER_STATE"
 
+        @RequiresApi(Build.VERSION_CODES.O)
         fun startServiceCompatibility(context: Context, intent: Intent) {
             context.startForegroundService(intent)
         }
@@ -147,13 +149,12 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
     /**
      *
      */
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onDestroy() {
         super.onDestroy()
         portSipSdk.destroyConference()
 
-        if (mNetWorkReceiver != null) {
-            unregisterReceiver(mNetWorkReceiver)
-        }
+        unregisterReceiver(mNetWorkReceiver)
 //        if (mCpuLock != null) {
 //            mCpuLock.release()
 //        }

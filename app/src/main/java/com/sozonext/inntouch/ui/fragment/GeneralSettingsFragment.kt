@@ -28,6 +28,9 @@ class GeneralSettingsFragment : Fragment() {
             mapOf(
                 "key" to "キャッシュを削除する",
             ),
+            mapOf(
+                "key" to "閉じる (もどる)",
+            ),
         )
         listView.adapter = SimpleAdapter(
             context,
@@ -44,6 +47,8 @@ class GeneralSettingsFragment : Fragment() {
                 1 -> stopKioskMode()
                 // キャッシュを削除する
                 2 -> clearCache()
+                // キャッシュを削除する
+                3 -> requireActivity().finish()
             }
         }
         return listView

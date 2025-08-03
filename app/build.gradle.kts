@@ -8,10 +8,10 @@ android {
     compileSdk = 35
     defaultConfig {
         applicationId = "com.sozonext.inntouch"
-        minSdk = 30 // Android 12
+        minSdk = 24 // Android 7 (Release: 2016/08)
         targetSdk = 35
         versionCode = 1
-        versionName = "v1.0.0-debug"
+        versionName = "v1.0.0-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -59,7 +59,6 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    // implementation(libs.google.services)
     implementation(libs.firebase.messaging)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.barcode.scanning)
@@ -69,5 +68,4 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.okhttp)
     implementation(files("libs/portsip_voip_sdk_for_android_v19.4.7.jar"))
-    // implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
 }
