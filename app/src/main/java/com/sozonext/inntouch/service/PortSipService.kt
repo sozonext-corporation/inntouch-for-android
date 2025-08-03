@@ -136,8 +136,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
                     pushToken = task.result
                     if (!TextUtils.isEmpty(pushToken) && SessionManager.getInstance().isRegistered) {
                         val pushMessage = "device-os=android;device-uid=$pushToken;allow-call-push=true;allow-message-push=true;app-id=${APP_ID}"
-                        portSipSdk.addSipMessageHeader(-1, "REGISTER", 1, "portsip-push", pushMessage)
-                        portSipSdk.addSipMessageHeader(-1, "REGISTER", 1, "x-p-push", pushMessage)
+                        portSipSdk.addSipMessageHeader(-1, "REGISTER", 1, "X-Push", pushMessage)
                         portSipSdk.refreshRegistration(0)
                     }
                 }
@@ -558,9 +557,8 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         portSipSdk.enable3GppTags(false)
 
         if (!TextUtils.isEmpty(pushToken)) {
-            val headerValue = "device-os=android;device-uid=$pushToken;allow-call-push=true;allow-message-push=true;app-id=$APP_ID"
-            portSipSdk.addSipMessageHeader(-1, "REGISTER", 1, "x-p-push", headerValue)
-            portSipSdk.addSipMessageHeader(-1, "REGISTER", 1, "portsip-push", headerValue)
+            val message = "device-os=android;device-uid=$pushToken;allow-call-push=true;allow-message-push=true;app-id=$APP_ID"
+            portSipSdk.addSipMessageHeader(-1, "REGISTER", 1, "X-Push", message);
         }
 
         result = portSipSdk.registerServer(90, 0)

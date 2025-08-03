@@ -67,5 +67,5 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.okhttp)
-    implementation(files("libs/portsip_voip_sdk_for_android_v19.4.7.jar"))
+    implementation(files("libs/portsip_voip_sdk_for_android_v19.5.0.jar"))
 }
