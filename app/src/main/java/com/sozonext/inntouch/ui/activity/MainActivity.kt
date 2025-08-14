@@ -16,6 +16,8 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.telephony.TelephonyCallback
+import android.telephony.TelephonyManager
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -30,11 +32,14 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.sozonext.inntouch.BuildConfig
+import com.sozonext.inntouch.MyTelephonyCallback
 import com.sozonext.inntouch.R
 import com.sozonext.inntouch.service.PortSipService
 import com.sozonext.inntouch.service.PortSipService.Companion.EXTRA_TARGET_EXTENSION_DISPLAY_NAME
@@ -56,6 +61,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
     companion object {
         private const val REQUEST_CODE_CAMERA_AND_AUDIO = 2
+        private const val REQUEST_CODE_READ_PHONE_STATE = 1001
     }
 
     @SuppressLint("SetJavaScriptEnabled", "UnspecifiedRegisterReceiverFlag", "ClickableViewAccessibility")
@@ -69,6 +75,8 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
         // Permissions
         requestPermissions()
+
+        checkPhoneStatePermission()
 
         // Kiosk Mode
         KioskUtil(this).start(this)
@@ -128,6 +136,12 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             }
 
         }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {  // API 31+
+            val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            val callback = MyTelephonyCallback(this)
+            telephonyManager.registerTelephonyCallback(mainExecutor, callback)
+        }
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag", "BatteryLife", "ServiceCast")
@@ -160,6 +174,17 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             launchQRCodeActivity()
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        Log.d(tag, "onNewIntent called with intent: $intent")
+        intent.getStringExtra("action")?.let { action ->
+            if (action == "incoming_call") {
+                webView.evaluateJavascript("javascript:onIncomingCall('フロント')", null)
+            }
+        }
+    }
+
 
     override fun onPause() {
         super.onPause()
@@ -198,6 +223,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.S)
     @SuppressLint("ImplicitSamInstance")
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray, deviceId: Int) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults, deviceId)
@@ -212,9 +238,45 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                     }
                 }
             }
+            REQUEST_CODE_READ_PHONE_STATE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // 許可されたのでコールバック登録
+                    registerTelephonyCallback()
+                } else {
+                    Toast.makeText(this, "電話状態の読み取り権限が必要です", Toast.LENGTH_LONG).show()
+                    // 必要ならアプリ終了や別の対応
+                }
+            }
         }
     }
 
+    private fun checkPhoneStatePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE)
+                != PackageManager.PERMISSION_GRANTED) {
+                // パーミッションリクエスト
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.READ_PHONE_STATE),
+                    REQUEST_CODE_READ_PHONE_STATE
+                )
+            } else {
+                // 許可済みならコールバック登録など開始
+                registerTelephonyCallback()
+            }
+        } else {
+            // M未満なら自動で許可されている扱い
+            registerTelephonyCallback()
+        }
+    }
+
+    private fun registerTelephonyCallback() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            val callback = MyTelephonyCallback(this)
+            telephonyManager.registerTelephonyCallback(mainExecutor, callback)
+        }
+    }
 
     private val broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -237,7 +299,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                 }
 
                 Intent.ACTION_BATTERY_CHANGED -> {
-                    Log.d(tag, "onBatteryChargingStatusChanged()")
+                    // Log.d(tag, "onBatteryChargingStatusChanged()")
                     intent.let {
                         val status = it.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
                         val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL

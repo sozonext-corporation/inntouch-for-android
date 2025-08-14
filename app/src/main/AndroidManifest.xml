@@ -17,9 +17,15 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" /> <!--ToDo-->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- OTHER -->
     <uses-permission
         android:name="android.permission.BIND_DEVICE_ADMIN"
@@ -30,6 +36,9 @@
     <uses-feature
         android:name="android.hardware.camera"
         android:required="true" />
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
 
     <application
         android:name=".application.MyApplication"
@@ -62,6 +71,10 @@
         <activity
             android:name=".ui.activity.QRCodeScannerActivity"
             android:exported="true" />
+        <!-- VideoCallActivity -->
+        <activity
+            android:name=".ui.activity.VideoCallActivity"
+            android:exported="true" />
         <!-- PortSipService -->
         <service
             android:name=".service.PortSipService"
@@ -72,6 +85,15 @@
                 <action android:name="com.sozonext.inntouch.action.SIP_REGISTER" />
             </intent-filter>
         </service>
+        <!-- MyFirebaseMessagingService -->
+        <service
+            android:name=".service.MyFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <!-- FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

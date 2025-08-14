@@ -1,15 +1,16 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.sozonext.inntouch"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.sozonext.inntouch"
         minSdk = 24 // Android 7 (Release: 2016/08)
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "v1.0.0-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -53,12 +54,13 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
-    implementation(libs.firebase.crashlytics.buildtools)
-    implementation(libs.androidx.media3.common.ktx)
-    implementation(libs.cronet.embedded)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    implementation(libs.firebase.crashlytics.buildtools)
+    implementation(libs.androidx.media3.common.ktx)
+    implementation(libs.cronet.embedded)
     implementation(libs.firebase.messaging)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.barcode.scanning)
@@ -67,5 +69,6 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.okhttp)
+    implementation(platform(libs.firebase.bom))
     implementation(files("libs/portsip_voip_sdk_for_android_v19.5.0.jar"))
 }

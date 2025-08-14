@@ -12,10 +12,10 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.os.PowerManager
 import android.text.TextUtils
 import android.util.Log
 import androidx.annotation.RequiresApi
+import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessaging
 import com.portsip.OnPortSIPEvent
 import com.portsip.PortSipEnumDefine
@@ -34,92 +34,73 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.util.Random
 
+
 class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListener {
 
     private val tag: String = PortSipService::class.java.simpleName
     private var pushToken: String = ""
 
-    private val portSipSdk = MyApplication.portSipSdk
+    private val portsip = MyApplication.portSipSdk
 
     companion object {
 
+        private const val CALL_NOTIFICATION = 31413
         private const val SERVICE_NOTIFICATION = 31414
-        private const val APP_ID = "com.sozonext.inntouch"
 
         const val ACTION_SIP_REGISTER: String = "com.sozonext.inntouch.action.SIP_REGISTER"
         const val ACTION_SIP_UNREGISTER: String = "com.sozonext.inntouch.action.SIP_UNREGISTER"
-
-        const val ACTION_ON_INVITE_ANSWERED: String = "com.sozonext.inntouch.action.ACTION_ON_INVITE_ANSWERED"
-        const val ACTION_ON_INCOMING_CALL: String = "com.sozonext.inntouch.action.ACTION_ON_INCOMING_CALL"
-        const val ACTION_ON_REJECT: String = "com.sozonext.inntouch.action.ACTION_ON_REJECT"
-
         const val ACTION_PUSH_TOKEN: String = "com.sozonext.inntouch.action.PUSH_TOKEN"
         const val ACTION_PUSH_MESSAGE: String = "com.sozonext.inntouch.action.PUSH_MESSAGE"
 
+        const val ACTION_ON_REJECT: String = "com.sozonext.inntouch.action.ACTION_ON_REJECT"
+
+        const val ACTION_ON_INVITE_ANSWERED: String = "com.sozonext.inntouch.action.ACTION_ON_INVITE_ANSWERED"
+        const val ACTION_ON_INCOMING_CALL: String = "com.sozonext.inntouch.action.ACTION_ON_INCOMING_CALL"
+
+
         const val ACTION_SIP_AUDIO_DEVICE_UPDATE: String = "com.sozonext.inntouch.action.ACTION_SIP_AUDIO_DEVICE_UPDATE"
 
-        const val INSTANCE_ID: String = "instanceId"
-        const val USER_NAME: String = "user name"
-        const val USER_PWD: String = "user pwd"
-        const val SVR_HOST: String = "svr host"
-        const val SVR_PORT: String = "svr port"
-        const val USER_DOMAIN: String = "user domain"
-        const val USER_DISPLAY_NAME: String = "user dispalay"
-        const val USER_AUTH_NAME: String = "user auth name"
-        const val STUN_HOST: String = "stun host"
-        const val STUN_PORT: String = "stun port"
-        const val TRANS: String = "trans type"
-        const val SRTP: String = "srtp type"
-        const val REGISTER_CHANGE_ACTION: String = "PortSip.AndroidSample.Test.RegisterStatusChange"
-        const val CALL_CHANGE_ACTION: String = "PortSip.AndroidSample.Test.CallStatusChange"
-        const val PRESENCE_CHANGE_ACTION: String = "PortSip.AndroidSample.Test.PRESENCEStatusChange"
+
+        const val REGISTER_CHANGE_ACTION: String = "portsip.AndroidSample.Test.RegisterStatusChange"
+        const val CALL_CHANGE_ACTION: String = "portsip.AndroidSample.Test.CallStatusChange"
+        const val PRESENCE_CHANGE_ACTION: String = "portsip.AndroidSample.Test.PRESENCEStatusChange"
 
         const val EXTRA_PUSH_TOKEN: String = "com.sozonext.inntouch.action.EXTRA_PUSH_TOKEN"
         const val EXTRA_TARGET_EXTENSION_DISPLAY_NAME: String = "com.sozonext.inntouch.action.EXTRA_TARGET_EXTENSION_DISPLAY_NAME"
         const val EXTRA_REGISTER_STATE: String = "com.sozonext.inntouch.action.EXTRA_REGISTER_STATE"
 
-        @RequiresApi(Build.VERSION_CODES.O)
-        fun startServiceCompatibility(context: Context, intent: Intent) {
-            context.startForegroundService(intent)
+        fun startServiceCompatible(context: Context, intent: Intent) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
         }
 
     }
 
-    private lateinit var mNotificationManager: NotificationManager
+    private val callChannelId = "com.sozonext.inntouch.notification.call";
+    private val serviceChannelId = "com.sozonext.inntouch.notification.service";
+
+    private lateinit var notificationManager: NotificationManager
     private lateinit var mNetWorkReceiver: NetWorkReceiver
+
+    override fun onBind(p0: Intent?): IBinder? {
+        return null
+    }
 
     override fun onCreate() {
         super.onCreate()
 
-        val channelId = getString(R.string.channel_id)
-        val highChannelId = "$channelId.HIGH"
+        initializeNotification()
 
-        mNotificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(channelId, getString(R.string.app_name), NotificationManager.IMPORTANCE_DEFAULT)
-        val callChannel = NotificationChannel(highChannelId, getString(R.string.app_name), NotificationManager.IMPORTANCE_HIGH)
-        channel.enableLights(true)
-        mNotificationManager.createNotificationChannel(channel)
-        mNotificationManager.createNotificationChannel(callChannel)
+        showServiceNotification()
 
-        //
-        val intent = Intent(this, MainActivity::class.java)
-        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-        val contentIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
-        val builder = Notification.Builder(this, channelId)
-
-        builder.setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(getString(R.string.app_name))
-            .setContentText("Service Running")
-            .setContentIntent(contentIntent)
-            .build()
-        startForeground(SERVICE_NOTIFICATION, builder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-
-        //
+        // registerReceiver
         val filter = IntentFilter()
         filter.addAction("android.net.conn.CONNECTIVITY_CHANGE")
         mNetWorkReceiver = NetWorkReceiver()
         mNetWorkReceiver.setListener(this)
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(mNetWorkReceiver, filter, RECEIVER_NOT_EXPORTED)
         } else {
@@ -130,18 +111,17 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
             FirebaseMessaging.getInstance().token
                 .addOnCompleteListener { task ->
                     if (!task.isSuccessful) {
-                        Log.w("FCM", "FCM token fetch failed", task.exception)
                         return@addOnCompleteListener
                     }
                     pushToken = task.result
                     if (!TextUtils.isEmpty(pushToken) && SessionManager.getInstance().isRegistered) {
-                        val pushMessage = "device-os=android;device-uid=$pushToken;allow-call-push=true;allow-message-push=true;app-id=${APP_ID}"
-                        portSipSdk.addSipMessageHeader(-1, "REGISTER", 1, "X-Push", pushMessage)
-                        portSipSdk.refreshRegistration(0)
+                        val pushMessage = "device-os=android;device-uid=$pushToken;allow-call-push=true;allow-message-push=true;app-id=$packageName"
+                        portsip.addSipMessageHeader(-1, "REGISTER", 1, "X-Push", pushMessage)
+                        portsip.refreshRegistration(0)
                     }
                 }
-        } catch (e: IllegalStateException) {
-            Log.d("FCM", "Token fetch failed with exception: ${e.message}")
+        } catch (e: java.lang.IllegalStateException) {
+            Log.d("", e.toString())
         }
     }
 
@@ -151,63 +131,60 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onDestroy() {
         super.onDestroy()
-        portSipSdk.destroyConference()
+        portsip.destroyConference()
+
+        Ring.getInstance(this).stopIncomingTone()
+        Ring.getInstance(this).stopOutgoingTone()
 
         unregisterReceiver(mNetWorkReceiver)
 //        if (mCpuLock != null) {
 //            mCpuLock.release()
 //        }
-        val channelId = getString(R.string.channel_id)
-        mNotificationManager.cancelAll()
-        mNotificationManager.deleteNotificationChannel(channelId)
-        mNotificationManager.deleteNotificationChannel("$channelId.HIGH")
-        portSipSdk.removeUser()
+        notificationManager.cancelAll()
+        notificationManager.deleteNotificationChannel(callChannelId)
+        notificationManager.deleteNotificationChannel(serviceChannelId)
+        portsip.removeUser()
     }
 
 
     @SuppressLint("ForegroundServiceType")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // ToDo
         val result = super.onStartCommand(intent, flags, startId)
-
-//        val channelId = getString(R.string.channel_id)
-//        val channelName = getString(R.string.channel_name)
-//
-//        val channel = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_LOW)
-//        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-//        manager.createNotificationChannel(channel)
-//
-//        val notification = NotificationCompat.Builder(this, channelId)
-//            .setContentTitle(channelName)
-//            .setContentText("$channelName is Running")
-//            .setSmallIcon(R.drawable.ic_launcher_foreground)
-//            .build()
-//
-//        startForeground(1, notification)
-
         if (intent != null) {
             when (intent.action) {
                 ACTION_SIP_REGISTER -> {
                     if (SessionManager.getInstance().isOnline) {
                         unregister()
                     }
+                    initialize()
                     register()
+                }
+
+                ACTION_SIP_UNREGISTER -> {
+                    unregister()
                 }
                 // ACTION_PUSH_TOKEN
                 ACTION_PUSH_TOKEN -> {
+                    pushToken = intent.getStringExtra(EXTRA_PUSH_TOKEN)!!
+                    if (!TextUtils.isEmpty(pushToken) && SessionManager.getInstance().isRegistered) {
+                        val pushMessage = "device-os=android;device-uid=$pushToken;allow-call-push=true;allow-message-push=true;app-id=$packageName"
+                        portsip.addSipMessageHeader(-1, "REGISTER", 1, "X-Push", pushMessage)
+                        portsip.refreshRegistration(0)
+                    }
                 }
                 // ACTION_PUSH_MESSAGE
                 ACTION_PUSH_MESSAGE -> {
+                    if (!SessionManager.getInstance().isOnline) {
+                        initialize()
+                    }
+                    if (!SessionManager.getInstance().isRegistered) {
+                        register()
+                    }
                 }
             }
         }
         return result
-    }
-
-    /**
-     * onBind
-     */
-    override fun onBind(p0: Intent): IBinder? {
-        return null
     }
 
     /**
@@ -238,7 +215,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         Log.d(tag, "onInviteIncoming: $sessionId, $callerDisplayName, $caller")
 
         if (SessionManager.getInstance().findIncomingCall() != null) {
-            portSipSdk.rejectCall(sessionId, 486)
+            portsip.rejectCall(sessionId, 486)
             return
         }
 
@@ -250,15 +227,15 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         session.targetExtensionNumber = caller
         session.targetExtensionDisplayName = callerDisplayName
 
-        val powerManager = getSystemService(POWER_SERVICE) as PowerManager
-        val wakeLock = powerManager.newWakeLock(
-            PowerManager.FULL_WAKE_LOCK or
-                    PowerManager.ACQUIRE_CAUSES_WAKEUP or
-                    PowerManager.ON_AFTER_RELEASE,
-            "MyApp:WakeLockTag"
-        )
-        wakeLock.acquire(3000L)
-        Thread.sleep(1000)
+//        val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+//        val wakeLock = powerManager.newWakeLock(
+//            PowerManager.FULL_WAKE_LOCK or
+//                    PowerManager.ACQUIRE_CAUSES_WAKEUP or
+//                    PowerManager.ON_AFTER_RELEASE,
+//            "MyApp:WakeLockTag"
+//        )
+//        wakeLock.acquire(3000L)
+//        Thread.sleep(1000)
         val intent = Intent(ACTION_ON_INCOMING_CALL)
         intent.setPackage(packageName)
         intent.putExtra(EXTRA_TARGET_EXTENSION_DISPLAY_NAME, callerDisplayName)
@@ -267,12 +244,18 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         // ToDo
     }
 
-    override fun onInviteTrying(p0: Long) {}
+    /**
+     * onInviteTrying()
+     */
+    override fun onInviteTrying(p0: Long) {
+        Log.d(tag, "onInviteTrying()")
+    }
 
     /**
      * onInviteSessionProgress
      */
     override fun onInviteSessionProgress(sessionId: Long, p1: String, p2: String, existsEarlyMedia: Boolean, p4: Boolean, p5: Boolean, p6: String) {
+        Log.d(tag, "onInviteSessionProgress()")
         val session: Session = SessionManager.getInstance().findSessionBySessionId(sessionId) ?: return
         session.existsEarlyMedia = existsEarlyMedia
     }
@@ -281,6 +264,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
      * onInviteRinging
      */
     override fun onInviteRinging(sessionId: Long, p1: String, p2: Int, p3: String) {
+        Log.d(tag, "onInviteRinging()")
         val session: Session = SessionManager.getInstance().findSessionBySessionId(sessionId) ?: return
         if (!session.existsEarlyMedia) {
             Ring.getInstance(this).startOutgoingTone();
@@ -291,7 +275,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
      * onInviteAnswered
      */
     override fun onInviteAnswered(sessionId: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: String, p7: Boolean, p8: Boolean, p9: String) {
-        Log.d(tag, "onInviteAnswered($sessionId)")
+        Log.d(tag, "onInviteAnswered()")
 
         Ring.getInstance(this).stopOutgoingTone();
 
@@ -305,6 +289,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
      * onInviteFailure
      */
     override fun onInviteFailure(sessionId: Long, p1: String, p2: String, p3: String, p4: String, p5: String, p6: Int, p7: String) {
+        Log.d(tag, "onInviteFailure()")
 
         Ring.getInstance(this).stopOutgoingTone()
 
@@ -322,6 +307,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
      * onInviteUpdated
      */
     override fun onInviteUpdated(sessionId: Long, p1: String, p2: String, p3: String, p4: Boolean, p5: Boolean, p6: Boolean, p7: String) {
+        Log.d(tag, "onInviteUpdated()")
 
         val session: Session = SessionManager.getInstance().findSessionBySessionId(sessionId) ?: return
         session.sessionStatus = SessionStatus.CONNECTED
@@ -333,7 +319,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
      * onInviteConnected
      */
     override fun onInviteConnected(sessionId: Long) {
-        Log.d(tag, "onInviteConnected($sessionId)")
+        Log.d(tag, "onInviteConnected()")
 
         val intent = Intent(ACTION_ON_INVITE_ANSWERED)
         intent.setPackage(packageName)
@@ -352,7 +338,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
      * onInviteClosed
      */
     override fun onInviteClosed(sessionId: Long, p1: String) {
-        Log.d(tag, "onInviteClosed: $sessionId, $p1")
+        Log.d(tag, "onInviteClosed()")
 
         Ring.getInstance(this).stopIncomingTone()
 
@@ -369,31 +355,31 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
     override fun onDialogStateUpdated(p0: String, p1: String, p2: String, p3: String) {}
 
-    override fun onRemoteHold(p0: Long) {}
+    override fun onRemoteHold(p0: Long) {
+        Log.d(tag, "onRemoteHold()")
+    }
 
-    override fun onRemoteUnHold(p0: Long, p1: String, p2: String, p3: Boolean, p4: Boolean) {}
+    override fun onRemoteUnHold(p0: Long, p1: String, p2: String, p3: Boolean, p4: Boolean) {
+        Log.d(tag, "onRemoteUnHold()")
+    }
 
     override fun onReceivedRefer(p0: Long, p1: Long, p2: String, p3: String, p4: String) {}
 
-    /**
-     * onReferAccepted
-     */
-    override fun onReferAccepted(p0: Long) {
-        Log.d(tag, "onReferAccepted: $p0")
-        // ToDo
-    }
+    override fun onReferAccepted(p0: Long) {}
 
     override fun onReferRejected(p0: Long, p1: String, p2: Int) {}
 
     override fun onTransferTrying(p0: Long) {}
 
-    override fun onTransferRinging(p0: Long) {}
+    override fun onTransferRinging(p0: Long) {
+        Log.d(tag, "onTransferRinging()")
+    }
 
     /**
      * onACTVTransferSuccess
      */
     override fun onACTVTransferSuccess(p0: Long) {
-        Log.d(tag, "onACTVTransferSuccess: $p0")
+        Log.d(tag, "onACTVTransferSuccess()")
         // ToDo
     }
 
@@ -401,7 +387,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
      * onACTVTransferFailure
      */
     override fun onACTVTransferFailure(p0: Long, p1: String, p2: Int) {
-        Log.d(tag, "onACTVTransferFailure: $p0, $p1, $p2")
+        Log.d(tag, "onACTVTransferFailure()")
         // ToDo
     }
 
@@ -409,9 +395,13 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
     override fun onSendingSignaling(p0: Long, p1: String) {}
 
-    override fun onWaitingVoiceMessage(p0: String, p1: Int, p2: Int, p3: Int, p4: Int) {}
+    override fun onWaitingVoiceMessage(p0: String, p1: Int, p2: Int, p3: Int, p4: Int) {
+        Log.d(tag, "onWaitingVoiceMessage()")
+    }
 
-    override fun onWaitingFaxMessage(p0: String, p1: Int, p2: Int, p3: Int, p4: Int) {}
+    override fun onWaitingFaxMessage(p0: String, p1: Int, p2: Int, p3: Int, p4: Int) {
+        Log.d(tag, "onWaitingFaxMessage()")
+    }
 
     override fun onRecvDtmfTone(p0: Long, p1: Int) {}
 
@@ -419,28 +409,15 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
     override fun onRecvInfo(p0: String) {}
 
-    override fun onRecvNotifyOfSubscription(p0: Long, p1: String, p2: ByteArray, p3: Int) {}
-
-    /**
-     * onPresenceRecvSubscribe
-     */
-    override fun onPresenceRecvSubscribe(p0: Long, p1: String, p2: String, p3: String) {
-        Log.d(tag, "onPresenceRecvSubscribe: $p0, $p1, $p2, $p3")
+    override fun onRecvNotifyOfSubscription(p0: Long, p1: String, p2: ByteArray, p3: Int) {
+        Log.d(tag, "onRecvNotifyOfSubscription()")
     }
 
-    /**
-     * onPresenceOnline
-     */
-    override fun onPresenceOnline(p0: String, p1: String, p2: String) {
-        Log.d(tag, "onPresenceOnline: $p0, $p1, $p2")
-    }
+    override fun onPresenceRecvSubscribe(p0: Long, p1: String, p2: String, p3: String) {}
 
-    /**
-     * onPresenceOffline
-     */
-    override fun onPresenceOffline(p0: String, p1: String) {
-        Log.d(tag, "onPresenceOffline: $p0, $p1")
-    }
+    override fun onPresenceOnline(p0: String, p1: String, p2: String) {}
+
+    override fun onPresenceOffline(p0: String, p1: String) {}
 
     override fun onRecvMessage(p0: Long, p1: String, p2: String, p3: ByteArray, p4: Int) {}
 
@@ -466,7 +443,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
      * onAudioDeviceChanged
      */
     override fun onAudioDeviceChanged(p0: PortSipEnumDefine.AudioDevice, p1: MutableSet<PortSipEnumDefine.AudioDevice>) {
-        Log.d(tag, "onAudioDeviceChanged: $p0, $p1")
+        Log.d(tag, "onAudioDeviceChanged()")
         // ToDo
     }
 
@@ -478,39 +455,88 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
 
     override fun onVideoRawCallback(p0: Long, p1: Int, p2: Int, p3: Int, p4: ByteArray, p5: Int) {}
 
-    /**
-     * onNetworkChange
-     */
     override fun onNetworkChange(netMobile: Int) {
+        Log.d(tag, "onNetworkChange()")
         // ToDo
     }
 
+    private fun initializeNotification() {
+
+        notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+
+            // 音声通話/ビデオ通話の通知
+            val callChannel = NotificationChannel(callChannelId, "音声通話/ビデオ通話の通知", NotificationManager.IMPORTANCE_HIGH)
+            callChannel.vibrationPattern = longArrayOf(0, 500, 200, 500)
+            callChannel.setSound(null, null)
+            callChannel.enableVibration(true)
+            callChannel.setAllowBubbles(true)
+            callChannel.setShowBadge(false)
+            callChannel.enableLights(true)
+            callChannel.lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            notificationManager.createNotificationChannel(callChannel)
+
+            // サービスの通知
+            val serviceChannel = NotificationChannel(serviceChannelId, "サービスの通知", NotificationManager.IMPORTANCE_LOW)
+            serviceChannel.enableVibration(false)
+            serviceChannel.enableLights(false)
+            serviceChannel.setShowBadge(false)
+            serviceChannel.setSound(null, Notification.AUDIO_ATTRIBUTES_DEFAULT)
+            notificationManager.createNotificationChannel(serviceChannel)
+        }
+        val intent = Intent(this, MainActivity::class.java)
+        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+        val contentIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, callChannelId)
+        } else {
+            Notification.Builder(this)
+        }
+        builder.setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText("Service Running")
+            .setContentIntent(contentIntent)
+            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                SERVICE_NOTIFICATION, builder.build(), (
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                                or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                                or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            )
+        } else {
+            startForeground(SERVICE_NOTIFICATION, builder.build())
+        }
+    }
+
     /**
-     * register
+     * initialize SDK
      */
-    private fun register() {
-        portSipSdk.setOnPortSIPEvent(this)
-
+    private fun initialize() {
+        portsip.setOnPortSIPEvent(this)
         SessionManager.getInstance().isOnline = true
-
         val externalFilesPath = getExternalFilesDir(null)!!.absolutePath
         val tlsCertificatesRootPath = "$externalFilesPath/certs"
         val localSIPPort = 5060 + Random().nextInt(60000)
-
-        var result = portSipSdk.initialize(
-            ENUM_TRANSPORT_UDP, "0.0.0.0", localSIPPort, PortSipEnumDefine.ENUM_LOG_LEVEL_DEBUG, externalFilesPath, 8, "PortSIP SDK for Android", 0, 0, tlsCertificatesRootPath, "", false, null
+        var result = portsip.initialize(
+            ENUM_TRANSPORT_UDP, "0.0.0.0", localSIPPort, PortSipEnumDefine.ENUM_LOG_LEVEL_DEBUG, externalFilesPath, 8, "portsip SDK for Android", 0, 0, tlsCertificatesRootPath, "", false, null
         )
-
         if (result != PortSipErrorcode.ECoreErrorNone) {
             SessionManager.getInstance().resetAll()
         } else {
-            result = portSipSdk.setLicenseKey("HO1KH-5ZQ8W-BJSZC-NIDRI-TH5UD")
+            result = portsip.setLicenseKey("HO1KH-5ZQ8W-BJSZC-NIDRI-TH5UD")
             if (result == PortSipErrorcode.ECoreWrongLicenseKey) {
                 Log.d(tag, "The wrong license key was detected, please check with sales@portsip.com or support@portsip.com")
             } else if (result == PortSipErrorcode.ECoreTrialVersionLicenseKey) {
                 Log.d(tag, "This Is Trial Version")
             }
         }
+    }
+
+    /**
+     * register
+     */
+    private fun register() {
 
         val sipServer: String = runBlocking {
             DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.SIP_SERVER).first().toString()
@@ -525,8 +551,8 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
             DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.EXTENSION_PASSWORD).first().toString()
         }
 
-        portSipSdk.removeUser()
-        result = portSipSdk.setUser(
+        portsip.removeUser()
+        var result = portsip.setUser(
             exceptionNumber,
             exceptionNumber,
             exceptionNumber,
@@ -546,25 +572,34 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
             return
         }
 
-        portSipSdk.enableAudioManager(true)
+        portsip.enableAudioManager(true)
 
-        portSipSdk.setAudioDevice(PortSipEnumDefine.AudioDevice.SPEAKER_PHONE)
-        portSipSdk.setVideoDeviceId(1)
+        portsip.setAudioDevice(PortSipEnumDefine.AudioDevice.SPEAKER_PHONE)
+        portsip.setVideoDeviceId(1)
 
-        portSipSdk.setSrtpPolicy(0)
-        // PortSipService.ConfigPreferences(this, preferences, portSipSdk)
+        portsip.setSrtpPolicy(0)
+        portsip.clearAudioCodec()
+        portsip.addAudioCodec(PortSipEnumDefine.ENUM_AUDIOCODEC_PCMA);
+        portsip.addAudioCodec(PortSipEnumDefine.ENUM_AUDIOCODEC_PCMU)
+        portsip.addAudioCodec(PortSipEnumDefine.ENUM_AUDIOCODEC_G729)
+        portsip.clearVideoCodec()
+        portsip.addVideoCodec(PortSipEnumDefine.ENUM_VIDEOCODEC_H264)
+        portsip.addVideoCodec(PortSipEnumDefine.ENUM_VIDEOCODEC_VP8)
+        portsip.addVideoCodec(PortSipEnumDefine.ENUM_VIDEOCODEC_VP9)
+        portsip.setVideoResolution(1920, 1200)
 
-        portSipSdk.enable3GppTags(false)
+        portsip.enable3GppTags(false)
 
         if (!TextUtils.isEmpty(pushToken)) {
-            val message = "device-os=android;device-uid=$pushToken;allow-call-push=true;allow-message-push=true;app-id=$APP_ID"
-            portSipSdk.addSipMessageHeader(-1, "REGISTER", 1, "X-Push", message);
+            Log.d("XXX", pushToken)
+            val message = "device-os=android;device-uid=$pushToken;allow-call-push=true;allow-message-push=true;app-id=$packageName"
+            portsip.addSipMessageHeader(-1, "REGISTER", 1, "X-Push", message);
         }
 
-        result = portSipSdk.registerServer(90, 0)
+        result = portsip.registerServer(60, 3)
         if (result != PortSipErrorcode.ECoreErrorNone) {
             Log.d(tag, "registerServer failure ErrorCode =$result")
-            portSipSdk.unRegisterServer(100)
+            portsip.unRegisterServer(100)
             SessionManager.getInstance().resetAll()
         }
     }
@@ -573,11 +608,76 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
      * unregister
      */
     private fun unregister() {
-        portSipSdk.unRegisterServer(100)
-        portSipSdk.removeUser()
-        portSipSdk.unInitialize()
+        portsip.unRegisterServer(100)
+        portsip.removeUser()
+        portsip.unInitialize()
         SessionManager.getInstance().isOnline = false
         SessionManager.getInstance().isRegistered = false
     }
 
+    private fun refreshPushToken(token: String) {
+        val pushMessage = "device-os=android;device-uid=$token;allow-call-push=true;allow-message-push=true;app-id=$packageName"
+        portsip.addSipMessageHeader(-1, "REGISTER", 1, "X-Push", pushMessage)
+        portsip.refreshRegistration(0)
+    }
+
+
+    private fun showServiceNotification() {
+        val intent = Intent(this, MainActivity::class.java)
+        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+        val contentIntent = PendingIntent.getActivity(this, 0,  /*requestCode*/intent, PendingIntent.FLAG_IMMUTABLE)
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, serviceChannelId)
+        } else {
+            Notification.Builder(this)
+        }
+        builder.setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText("Service Running")
+            .setContentIntent(contentIntent)
+            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            startForeground(
+                SERVICE_NOTIFICATION, builder.build(), (
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                                or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                                or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            )
+        } else {
+            startForeground(SERVICE_NOTIFICATION, builder.build())
+        }
+    }
+
+    private fun showCallNotification(context: Context, intent: Intent, contentTitle: String, contentText: String) {
+        val contentIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+        val builder: NotificationCompat.Builder = NotificationCompat.Builder(context, callChannelId)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(contentTitle)
+            .setContentText(contentText)
+            .setAutoCancel(true)
+            .setShowWhen(true)
+            .setContentIntent(contentIntent)
+            .setFullScreenIntent(contentIntent, true)
+        notificationManager.notify(PortSipService.CALL_NOTIFICATION, builder.build())
+    }
+
+    fun sendPortSipMessage(message: String?, broadIntent: Intent?) {
+        val intent = Intent(this, MainActivity::class.java)
+        val contentIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, serviceChannelId)
+        } else {
+            Notification.Builder(this)
+        }
+        builder.setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("Sip Notify")
+            .setContentText(message)
+            .setContentIntent(contentIntent)
+            .build()
+        notificationManager.notify(1, builder.build())
+        sendBroadcast(broadIntent)
+    }
+
 }
+// allSessionClosed()
+// onSessionChange()

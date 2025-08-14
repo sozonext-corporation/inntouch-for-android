@@ -1,5 +1,6 @@
 package com.sozonext.inntouch.ui
 
+import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -45,7 +46,7 @@ class JavaScriptInterface(private val context: Context) {
         val intent = Intent(context, PortSipService::class.java).apply {
             action = PortSipService.ACTION_SIP_REGISTER
         }
-        PortSipService.startServiceCompatibility(context, intent)
+        PortSipService.startServiceCompatible(context, intent)
 
         return true
     }
@@ -84,38 +85,6 @@ class JavaScriptInterface(private val context: Context) {
     @JavascriptInterface
     fun videoCall(extensionNumber: String): Boolean {
         Log.d(tag, "videoCall($extensionNumber)")
-
-        // Start Tone
-        Ring.getInstance(context).startOutgoingTone()
-
-        // TODO
-        portSipSdk.clearAudioCodec()
-        portSipSdk.addAudioCodec(PortSipEnumDefine.ENUM_AUDIOCODEC_PCMA);
-        portSipSdk.addAudioCodec(PortSipEnumDefine.ENUM_AUDIOCODEC_PCMU)
-        portSipSdk.addAudioCodec(PortSipEnumDefine.ENUM_AUDIOCODEC_G729)
-
-        portSipSdk.clearVideoCodec()
-        portSipSdk.addVideoCodec(PortSipEnumDefine.ENUM_VIDEOCODEC_H264)
-        portSipSdk.addVideoCodec(PortSipEnumDefine.ENUM_VIDEOCODEC_VP8)
-        portSipSdk.addVideoCodec(PortSipEnumDefine.ENUM_VIDEOCODEC_VP9)
-        portSipSdk.setVideoResolution(1920, 1200)
-
-        val sessionId = portSipSdk.call(extensionNumber, true, true)
-        if (sessionId <= 0) {
-            Toast.makeText(context, "Call failure: $sessionId", Toast.LENGTH_SHORT).show()
-            return false
-        }
-        portSipSdk.sendVideo(sessionId, true)
-        portSipSdk.setVideoDeviceId(1)
-
-        val session: Session = SessionManager.getInstance().getCurrentSession() ?: return false
-
-        val extensionDisplayName = ""
-
-        session.sessionStatus = TRYING
-        session.sessionId = sessionId
-        session.targetExtensionNumber = extensionNumber
-        session.targetExtensionDisplayName = extensionDisplayName
 
         val intent = Intent(context, VideoCallActivity::class.java).apply {
             putExtra("extensionNumber", extensionNumber)

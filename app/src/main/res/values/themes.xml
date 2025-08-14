@@ -1,9 +1,16 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.InnTouchApp" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
-    </style>
-
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Theme.InnTouchApp -->
     <style name="Theme.InnTouchApp" parent="Base.Theme.InnTouchApp" />
+    <!-- Base.Theme.InnTouchApp -->
+    <style name="Base.Theme.InnTouchApp" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowAnimationStyle">@style/ActivityAnimationNone</item>
+    </style>
+    <!-- ActivityAnimationNone -->
+    <style name="ActivityAnimationNone">
+        <item name="android:activityOpenEnterAnimation">@null</item>
+        <item name="android:activityOpenExitAnimation">@null</item>
+        <item name="android:activityCloseEnterAnimation">@null</item>
+        <item name="android:activityCloseExitAnimation">@null</item>
+    </style>
 </resources>
