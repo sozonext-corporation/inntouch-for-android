@@ -18,6 +18,10 @@ class KioskUtil(private val context: Context) {
         dpm.setLockTaskPackages(componentName, arrayOf(context.packageName))
     }
 
+    fun clearDeviceOwnerApp() {
+        dpm.clearDeviceOwnerApp("com.sozonext.inntouch")
+    }
+
     @SuppressLint("ServiceCast")
     fun start(activity: Activity) {
         if (hasDeviceOwnerPermission()) {

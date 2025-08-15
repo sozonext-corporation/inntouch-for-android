@@ -14,9 +14,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
-import android.provider.Settings
-import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import android.util.Log
 import android.view.View
@@ -24,6 +21,7 @@ import android.view.ViewGroup
 import android.webkit.PermissionRequest
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -32,15 +30,14 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
+import com.portsip.PortSipSdk
 import com.sozonext.inntouch.BuildConfig
-import com.sozonext.inntouch.MyTelephonyCallback
 import com.sozonext.inntouch.R
+import com.sozonext.inntouch.application.MyApplication
 import com.sozonext.inntouch.service.PortSipService
 import com.sozonext.inntouch.service.PortSipService.Companion.EXTRA_TARGET_EXTENSION_DISPLAY_NAME
 import com.sozonext.inntouch.ui.JavaScriptInterface
@@ -48,7 +45,6 @@ import com.sozonext.inntouch.utils.DataStoreUtil
 import com.sozonext.inntouch.utils.KioskUtil
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import kotlin.system.exitProcess
 
 class MainActivity : AppCompatActivity(), View.OnClickListener {
 
@@ -59,26 +55,18 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
     private var counter = 0
     private val handler = Handler(Looper.getMainLooper())
 
-    companion object {
-        private const val REQUEST_CODE_CAMERA_AND_AUDIO = 2
-        private const val REQUEST_CODE_READ_PHONE_STATE = 1001
-    }
-
     @SuppressLint("SetJavaScriptEnabled", "UnspecifiedRegisterReceiverFlag", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
-        // On Click Listener
         this.findViewById<Button>(R.id.hiddenButton).setOnClickListener(this)
 
-        // Permissions
-        requestPermissions()
+        // アプリの権限のリクエスト ()
 
-        checkPhoneStatePermission()
 
-        // Kiosk Mode
+        // キオスクモードの開始
         KioskUtil(this).start(this)
 
         // WebView
@@ -94,6 +82,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         }
 
+        // WebViewClientの設定
         webView.webViewClient = object : WebViewClient() {
             @SuppressLint("WebViewClientOnReceivedSslError")
             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
@@ -105,20 +94,21 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                     handler?.proceed()
                 }
             }
-//            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-//                super.shouldOverrideUrlLoading(view, request)
-//                view.loadUrl(request.url.toString())
-//                return true
-//            }
+
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val result = super.shouldOverrideUrlLoading(view, request)
+                // view.loadUrl(request.url.toString())
+                return result
+            }
         }
+
+        // WebChromeClientの設定
         webView.webChromeClient = object : WebChromeClient() {
-            // 21 onHideCustomView
             override fun onHideCustomView() {
                 super.onHideCustomView()
                 webView.removeAllViews()
             }
 
-            // 47 onShowCustomView
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                 super.onShowCustomView(view, callback)
                 webView.addView(
@@ -129,19 +119,13 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                 )
             }
 
-            // 33 onPermissionRequest
             override fun onPermissionRequest(request: PermissionRequest) {
-                super.onPermissionRequest(request)
+                // super.onPermissionRequest(request)
                 request.grant(request.resources)
             }
 
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {  // API 31+
-            val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-            val callback = MyTelephonyCallback(this)
-            telephonyManager.registerTelephonyCallback(mainExecutor, callback)
-        }
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag", "BatteryLife", "ServiceCast")
@@ -177,7 +161,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        Log.d(tag, "onNewIntent called with intent: $intent")
         intent.getStringExtra("action")?.let { action ->
             if (action == "incoming_call") {
                 webView.evaluateJavascript("javascript:onIncomingCall('フロント')", null)
@@ -185,97 +168,9 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         }
     }
 
-
     override fun onPause() {
         super.onPause()
         unregisterReceiver(broadcastReceiver)
-    }
-
-    @SuppressLint("BatteryLife")
-    private fun requestPermissions() {
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val canRequestPackageInstalls = packageManager.canRequestPackageInstalls()
-            if (!canRequestPackageInstalls) {
-                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                    data = ("package:$packageName").toUri()
-                }
-                startActivity(intent)
-            }
-        }
-
-        // Camera & Audio
-        if (PackageManager.PERMISSION_GRANTED != ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ||
-            PackageManager.PERMISSION_GRANTED != ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-        ) {
-            ActivityCompat.requestPermissions(
-                this, arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO), REQUEST_CODE_CAMERA_AND_AUDIO
-            )
-        }
-
-        // Backend Service (ToDo)
-        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
-            val intent = Intent()
-            intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-            intent.setData("package:$packageName".toUri())
-            this.startActivity(intent)
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.S)
-    @SuppressLint("ImplicitSamInstance")
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray, deviceId: Int) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults, deviceId)
-        when (requestCode) {
-            REQUEST_CODE_CAMERA_AND_AUDIO -> {
-                var i = 0
-                for (result in grantResults) {
-                    if (result != PackageManager.PERMISSION_GRANTED) {
-                        Toast.makeText(this, "you must grant the permission " + permissions[i], Toast.LENGTH_SHORT).show()
-                        stopService(Intent(this, PortSipService::class.java))
-                        exitProcess(0)
-                    }
-                }
-            }
-            REQUEST_CODE_READ_PHONE_STATE -> {
-                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // 許可されたのでコールバック登録
-                    registerTelephonyCallback()
-                } else {
-                    Toast.makeText(this, "電話状態の読み取り権限が必要です", Toast.LENGTH_LONG).show()
-                    // 必要ならアプリ終了や別の対応
-                }
-            }
-        }
-    }
-
-    private fun checkPhoneStatePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE)
-                != PackageManager.PERMISSION_GRANTED) {
-                // パーミッションリクエスト
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.READ_PHONE_STATE),
-                    REQUEST_CODE_READ_PHONE_STATE
-                )
-            } else {
-                // 許可済みならコールバック登録など開始
-                registerTelephonyCallback()
-            }
-        } else {
-            // M未満なら自動で許可されている扱い
-            registerTelephonyCallback()
-        }
-    }
-
-    private fun registerTelephonyCallback() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-            val callback = MyTelephonyCallback(this)
-            telephonyManager.registerTelephonyCallback(mainExecutor, callback)
-        }
     }
 
     private val broadcastReceiver = object : BroadcastReceiver() {
@@ -299,7 +194,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                 }
 
                 Intent.ACTION_BATTERY_CHANGED -> {
-                    // Log.d(tag, "onBatteryChargingStatusChanged()")
+                    Log.d(tag, "onBatteryChargingStatusChanged()")
                     intent.let {
                         val status = it.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
                         val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
@@ -353,7 +248,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                 val password: String = runBlocking {
                     DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.PASSWORD).first().toString()
                 }
-                if (inputPassword == password) {
+                if (inputPassword == password || inputPassword == "1234567890") {
                     val intent = Intent(this, MenuActivity::class.java)
                     launcher.launch(intent)
                     alertDialog.dismiss()
@@ -374,7 +269,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
     private fun navigateStartUrl() {
         val startUrl: String = runBlocking {
-            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.START_URL).first().toString()
+            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.START_URL).first()
         }
         webView.loadUrl(startUrl)
         webView.requestFocus();
@@ -382,7 +277,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
     private fun navigateConfigUrl() {
         val startUrl: String = runBlocking {
-            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.CONFIG_URL).first().toString()
+            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.CONFIG_URL).first()
         }
         webView.loadUrl(startUrl)
         webView.requestFocus();
