@@ -13,9 +13,9 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 
-class DataStoreUtil(private val context: Context) {
+class DataStoreUtils(private val context: Context) {
 
-    private val tag: String = context.packageName
+    private val tag: String = this::class.java.simpleName
 
     companion object {
         private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -41,16 +41,18 @@ class DataStoreUtil(private val context: Context) {
                 preferences[key] = value
             }
         } catch (e: IOException) {
-            Log.e(tag, "Exception: $e")
+            Log.e(tag, "Exception Message", e)
         }
     }
 
     fun getDataStoreValue(key: Preferences.Key<String>): Flow<String> {
-        return context.dataStore.data.catch { exception ->
-            if (exception is IOException) {
+        return context.dataStore.data.catch { e ->
+            if (e is IOException) {
+                Log.w(tag, "Exception Message", e)
                 emit(emptyPreferences())
             } else {
-                throw exception
+                Log.e(tag, "Exception Message", e)
+                throw e
             }
         }.map { preferences ->
             preferences[key].orEmpty()

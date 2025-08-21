@@ -17,6 +17,8 @@ import com.sozonext.inntouch.utils.SessionStatus
 
 class VideoCallActivity : AppCompatActivity(), View.OnClickListener {
 
+    private val tag = this::class.java.simpleName
+
     private val portSipSdk = MyApplication.portSipSdk
 
     private var localVideoView: PortSIPVideoRenderer? = null

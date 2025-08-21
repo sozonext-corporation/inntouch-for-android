@@ -4,12 +4,16 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
+import android.util.Log
 
 class NetWorkReceiver : BroadcastReceiver() {
+
+    private val tag = this::class.java.simpleName
 
     private lateinit var listener: NetWorkListener
 
     override fun onReceive(context: Context?, intent: Intent) {
+        Log.d(tag, "onReceive()")
         try {
             if (intent.action == ConnectivityManager.CONNECTIVITY_ACTION && null != context) {
                 val netWorkState: Int = getNetWorkState(context)

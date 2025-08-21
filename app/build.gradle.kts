@@ -13,8 +13,8 @@ android {
         applicationId = "com.sozonext.inntouch"
         minSdk = 24 // Android 7 (Release: 2016/08)
         targetSdk = 36
-        versionCode = 25081501
-        versionName = "v1.0.0"
+        versionCode = 25082201
+        versionName = "v1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {

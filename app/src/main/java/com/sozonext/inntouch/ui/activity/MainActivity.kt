@@ -1,6 +1,5 @@
 package com.sozonext.inntouch.ui.activity
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -14,7 +13,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.telephony.TelephonyManager
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -32,23 +30,20 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import com.portsip.PortSipSdk
 import com.sozonext.inntouch.BuildConfig
 import com.sozonext.inntouch.R
-import com.sozonext.inntouch.application.MyApplication
 import com.sozonext.inntouch.service.PortSipService
 import com.sozonext.inntouch.service.PortSipService.Companion.EXTRA_TARGET_EXTENSION_DISPLAY_NAME
 import com.sozonext.inntouch.ui.JavaScriptInterface
-import com.sozonext.inntouch.utils.DataStoreUtil
+import com.sozonext.inntouch.utils.DataStoreUtils
 import com.sozonext.inntouch.utils.KioskUtil
+import com.sozonext.inntouch.utils.PermissionUtils
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 class MainActivity : AppCompatActivity(), View.OnClickListener {
 
-    private val tag: String = MainActivity::class.java.simpleName
+    private val tag = this::class.java.simpleName
 
     private lateinit var webView: WebView
 
@@ -100,6 +95,13 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                 // view.loadUrl(request.url.toString())
                 return result
             }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                intent?.getStringExtra(EXTRA_TARGET_EXTENSION_DISPLAY_NAME)?.let {
+                    webView.evaluateJavascript("javascript:onIncomingCall('$it')", null)
+                }
+            }
         }
 
         // WebChromeClientの設定
@@ -149,7 +151,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
         // WebViewの初期表示
         val startUrl: String = runBlocking {
-            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.START_URL).first().toString()
+            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.START_URL).first().toString()
         }
         if (startUrl.isNotEmpty()) {
             webView.loadUrl(startUrl)
@@ -171,6 +173,17 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
     override fun onPause() {
         super.onPause()
         unregisterReceiver(broadcastReceiver)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PermissionUtils.REQUEST_CODE_CAMERA_AND_AUDIO) {
+            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                launchQRCodeActivity()
+            } else {
+                Toast.makeText(this, "カメラとマイクの権限が必要です", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private val broadcastReceiver = object : BroadcastReceiver() {
@@ -246,7 +259,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             alertDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val inputPassword = dialogEditPassword.findViewById<EditText>(R.id.editTextPassword).text.toString()
                 val password: String = runBlocking {
-                    DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.PASSWORD).first().toString()
+                    DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.PASSWORD).first().toString()
                 }
                 if (inputPassword == password || inputPassword == "1234567890") {
                     val intent = Intent(this, MenuActivity::class.java)
@@ -269,7 +282,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
     private fun navigateStartUrl() {
         val startUrl: String = runBlocking {
-            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.START_URL).first()
+            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.START_URL).first()
         }
         webView.loadUrl(startUrl)
         webView.requestFocus();
@@ -277,15 +290,26 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
     private fun navigateConfigUrl() {
         val startUrl: String = runBlocking {
-            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.CONFIG_URL).first()
+            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.CONFIG_URL).first()
         }
         webView.loadUrl(startUrl)
         webView.requestFocus();
     }
 
     private fun launchQRCodeActivity() {
-        val intent = Intent(this, QRCodeScannerActivity::class.java)
-        launcher.launch(intent)
+        val permissions = arrayOf(
+            android.Manifest.permission.CAMERA,
+            android.Manifest.permission.RECORD_AUDIO
+        )
+        val hasPermission = permissions.any {
+            checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (hasPermission) {
+            val intent = Intent(this, QRCodeScannerActivity::class.java)
+            launcher.launch(intent)
+        } else {
+            requestPermissions(permissions, PermissionUtils.REQUEST_CODE_CAMERA_AND_AUDIO)
+        }
     }
 
 }

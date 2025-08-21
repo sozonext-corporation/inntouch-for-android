@@ -1,6 +1,5 @@
 package com.sozonext.inntouch.ui
 
-import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -17,7 +16,7 @@ import com.portsip.PortSipEnumDefine
 import com.sozonext.inntouch.application.MyApplication
 import com.sozonext.inntouch.service.PortSipService
 import com.sozonext.inntouch.ui.activity.VideoCallActivity
-import com.sozonext.inntouch.utils.DataStoreUtil
+import com.sozonext.inntouch.utils.DataStoreUtils
 import com.sozonext.inntouch.utils.Ring
 import com.sozonext.inntouch.utils.Session
 import com.sozonext.inntouch.utils.SessionManager
@@ -29,7 +28,8 @@ import org.json.JSONObject
 
 class JavaScriptInterface(private val context: Context) {
 
-    private val tag: String = context.packageName
+    private val tag = this::class.java.simpleName
+
     private val portSipSdk = MyApplication.portSipSdk
 
     @JavascriptInterface
@@ -37,10 +37,10 @@ class JavaScriptInterface(private val context: Context) {
         Log.d(tag, "register($sipServer, $sipDomain, $extensionNumber, $extensionPassword)")
 
         runBlocking {
-            DataStoreUtil(context).setDataStoreValue(DataStoreUtil.SIP_SERVER, sipServer)
-            DataStoreUtil(context).setDataStoreValue(DataStoreUtil.SIP_DOMAIN, sipDomain)
-            DataStoreUtil(context).setDataStoreValue(DataStoreUtil.EXTENSION_NUMBER, extensionNumber)
-            DataStoreUtil(context).setDataStoreValue(DataStoreUtil.EXTENSION_PASSWORD, extensionPassword)
+            DataStoreUtils(context).setDataStoreValue(DataStoreUtils.SIP_SERVER, sipServer)
+            DataStoreUtils(context).setDataStoreValue(DataStoreUtils.SIP_DOMAIN, sipDomain)
+            DataStoreUtils(context).setDataStoreValue(DataStoreUtils.EXTENSION_NUMBER, extensionNumber)
+            DataStoreUtils(context).setDataStoreValue(DataStoreUtils.EXTENSION_PASSWORD, extensionPassword)
         }
 
         val intent = Intent(context, PortSipService::class.java).apply {

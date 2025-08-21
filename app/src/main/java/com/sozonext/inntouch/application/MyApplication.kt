@@ -5,6 +5,8 @@ import com.portsip.PortSipSdk
 
 class MyApplication : Application() {
 
+    private val tag = this::class.java.simpleName
+
     companion object {
         lateinit var portSipSdk: PortSipSdk
             private set

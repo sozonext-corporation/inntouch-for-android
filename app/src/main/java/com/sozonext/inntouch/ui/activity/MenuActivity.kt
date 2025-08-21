@@ -16,6 +16,8 @@ import com.sozonext.inntouch.ui.fragment.SystemSettingsFragment
 
 class MenuActivity : AppCompatActivity() {
 
+    private val tag = this::class.java.simpleName
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

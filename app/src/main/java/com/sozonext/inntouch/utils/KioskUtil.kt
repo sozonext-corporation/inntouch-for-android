@@ -1,15 +1,17 @@
 package com.sozonext.inntouch.utils
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.widget.Toast
-
 import com.sozonext.inntouch.MyDeviceAdminReceiver
 
 class KioskUtil(private val context: Context) {
+
+    companion object {
+        private val TAG = this::class.java.simpleName
+    }
 
     private val componentName = ComponentName(context, MyDeviceAdminReceiver::class.java)
     private val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
@@ -18,11 +20,12 @@ class KioskUtil(private val context: Context) {
         dpm.setLockTaskPackages(componentName, arrayOf(context.packageName))
     }
 
-    fun clearDeviceOwnerApp() {
-        dpm.clearDeviceOwnerApp("com.sozonext.inntouch")
+    fun removeDeviceOwner() {
+        if (dpm.isDeviceOwnerApp(context.packageName)) {
+            dpm.clearDeviceOwnerApp(context.packageName)
+        }
     }
 
-    @SuppressLint("ServiceCast")
     fun start(activity: Activity) {
         if (hasDeviceOwnerPermission()) {
             activity.startLockTask()

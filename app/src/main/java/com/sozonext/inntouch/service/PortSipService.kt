@@ -1,5 +1,6 @@
 package com.sozonext.inntouch.service
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
@@ -9,13 +10,17 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.text.TextUtils
 import android.util.Log
 import androidx.annotation.RequiresApi
+import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import com.google.firebase.messaging.FirebaseMessaging
 import com.portsip.OnPortSIPEvent
 import com.portsip.PortSipEnumDefine
@@ -25,7 +30,7 @@ import com.sozonext.inntouch.R
 import com.sozonext.inntouch.application.MyApplication
 import com.sozonext.inntouch.receiver.NetWorkReceiver
 import com.sozonext.inntouch.ui.activity.MainActivity
-import com.sozonext.inntouch.utils.DataStoreUtil
+import com.sozonext.inntouch.utils.DataStoreUtils
 import com.sozonext.inntouch.utils.Ring
 import com.sozonext.inntouch.utils.Session
 import com.sozonext.inntouch.utils.SessionManager
@@ -37,13 +42,13 @@ import java.util.Random
 
 class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListener {
 
-    private val tag: String = PortSipService::class.java.simpleName
-    private var pushToken: String = ""
+    private val tag = this::class.java.simpleName
 
     private val portsip = MyApplication.portSipSdk
 
+    private var pushToken: String = ""
+    
     companion object {
-
         private const val CALL_NOTIFICATION = 31413
         private const val SERVICE_NOTIFICATION = 31414
 
@@ -211,6 +216,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
     /**
      * onInviteIncoming
      */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     override fun onInviteIncoming(sessionId: Long, callerDisplayName: String, caller: String, p3: String, p4: String, p5: String, p6: String, p7: Boolean, p8: Boolean, p9: String) {
         Log.d(tag, "onInviteIncoming: $sessionId, $callerDisplayName, $caller")
 
@@ -227,21 +233,10 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
         session.targetExtensionNumber = caller
         session.targetExtensionDisplayName = callerDisplayName
 
-//        val powerManager = getSystemService(POWER_SERVICE) as PowerManager
-//        val wakeLock = powerManager.newWakeLock(
-//            PowerManager.FULL_WAKE_LOCK or
-//                    PowerManager.ACQUIRE_CAUSES_WAKEUP or
-//                    PowerManager.ON_AFTER_RELEASE,
-//            "MyApp:WakeLockTag"
-//        )
-//        wakeLock.acquire(3000L)
-//        Thread.sleep(1000)
         val intent = Intent(ACTION_ON_INCOMING_CALL)
         intent.setPackage(packageName)
         intent.putExtra(EXTRA_TARGET_EXTENSION_DISPLAY_NAME, callerDisplayName)
         sendBroadcast(intent)
-
-        // ToDo
     }
 
     /**
@@ -485,7 +480,7 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
             notificationManager.createNotificationChannel(serviceChannel)
         }
         val intent = Intent(this, MainActivity::class.java)
-        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+        intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
         val contentIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, callChannelId)
@@ -497,13 +492,22 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
             .setContentText("Service Running")
             .setContentIntent(contentIntent)
             .build()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                SERVICE_NOTIFICATION, builder.build(), (
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                                or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-                                or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-            )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED &&
+                checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+            ) {
+                startForeground(
+                    SERVICE_NOTIFICATION, builder.build(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                startForeground(
+                    SERVICE_NOTIFICATION, builder.build(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            }
         } else {
             startForeground(SERVICE_NOTIFICATION, builder.build())
         }
@@ -539,16 +543,16 @@ class PortSipService : Service(), OnPortSIPEvent, NetWorkReceiver.NetWorkListene
     private fun register() {
 
         val sipServer: String = runBlocking {
-            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.SIP_SERVER).first().toString()
+            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.SIP_SERVER).first().toString()
         }
         val sipDomain: String = runBlocking {
-            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.SIP_DOMAIN).first().toString()
+            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.SIP_DOMAIN).first().toString()
         }
         val exceptionNumber: String = runBlocking {
-            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.EXTENSION_NUMBER).first().toString()
+            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.EXTENSION_NUMBER).first().toString()
         }
         val exceptionPassword: String = runBlocking {
-            DataStoreUtil(applicationContext).getDataStoreValue(DataStoreUtil.EXTENSION_PASSWORD).first().toString()
+            DataStoreUtils(applicationContext).getDataStoreValue(DataStoreUtils.EXTENSION_PASSWORD).first().toString()
         }
 
         portsip.removeUser()

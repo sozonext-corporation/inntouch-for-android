@@ -1,7 +1,4 @@
 <resources>
     <string name="app_name">InnTouch</string>
-    <string name="latest_apk_url">https://cdn.inntouch.jp/apk/latest/inntouch-latest-release.apk</string>
     <string name="latest_apk_version_url">https://cdn.inntouch.jp/apk/latest/version.json</string>
-    <string name="channel_id">com.sozonext.inntouch.notification</string>
-    <string name="channel_name">InnTouch Notification Service</string>
 </resources>

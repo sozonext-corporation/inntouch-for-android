@@ -1,5 +1,4 @@
 <resources>
     <string name="app_name">InnTouch (Debug)</string>
-    <string name="latest_apk_url">https://cdn.inntouch.jp/apk/debug/latest/inntouch-latest-debug.apk</string>
     <string name="latest_apk_version_url">https://cdn.inntouch.jp/apk/debug/latest/version.json</string>
 </resources>
