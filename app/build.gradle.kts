@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 android {
@@ -63,7 +64,11 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
-    implementation(libs.firebase.crashlytics.buildtools)
+    // Crashlytics
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics.ndk)
+    implementation(libs.firebase.analytics)
+
     implementation(libs.androidx.media3.common.ktx)
     implementation(libs.cronet.embedded)
     implementation(libs.firebase.messaging)
@@ -74,6 +79,7 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.okhttp)
-    implementation(platform(libs.firebase.bom))
+
+    // PortSIP SDK
     implementation(files("libs/portsip_voip_sdk_for_android_v19.5.0.jar"))
 }

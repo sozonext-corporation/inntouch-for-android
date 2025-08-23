@@ -1,11 +1,11 @@
 [versions]
-agp = "8.12.0"
+agp = "8.12.1"
 barcodeScanning = "17.3.0"
 cameraCore = "1.4.2"
 datastorePreferences = "1.1.7"
 firebaseBom = "34.1.0"
 firebaseMessaging = "25.0.0"
-kotlin = "2.2.0"
+kotlin = "2.2.10"
 coreKtx = "1.17.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
@@ -27,8 +27,13 @@ androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
 barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "barcodeScanning" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-crashlytics-ktx = { module = "com.google.firebase:firebase-crashlytics-ktx" }
+firebase-crashlytics-ndk = { module = "com.google.firebase:firebase-crashlytics-ndk" }
 firebase-messaging = { module = "com.google.firebase:firebase-messaging", version.ref = "firebaseMessaging" }
+google-firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+google-firebase-crashlytics-ndk = { module = "com.google.firebase:firebase-crashlytics-ndk" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
